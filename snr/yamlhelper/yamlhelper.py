@@ -1,0 +1,70 @@
+# -*- coding: utf8 -*-
+# ------------------------------------------------------------------------------
+# Name:        yamlhelper
+# Purpose:     
+#
+#
+# Author:      Jonathan Besanceney <jonathan.besanceney@gmail.com>
+#
+#
+# Created:     15/09/2019
+# Copyright:   (c) 2019 docker
+#
+# Licence:     LGPLv3 2016.
+#
+# This file is a part of docker.
+#
+#    docker is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Lesser General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    docker is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Lesser General Public License for more details.
+#
+#    You should have received a copy of the GNU Lesser General Public License
+#    along with docker.  If not, see <http://www.gnu.org/licenses/>.
+# ------------------------------------------------------------------------------
+import sys
+import logging
+from yaml import load, YAMLError
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
+from yaml.parser import ParserError
+
+logger = logging.getLogger(__name__)
+
+
+class YAMLHelper:
+    cache = dict()
+
+    @staticmethod
+    def load(conf, reload=False):
+        if conf not in YAMLHelper.cache.keys() or reload:
+            try:
+                with open(conf, 'r') as f:
+                    data = load(f, Loader=Loader)
+                YAMLHelper.cache[conf] = data
+            except (ParserError, YAMLError) as e:
+                logger.error("Aborting : {}".format(e))
+                sys.exit(1)
+            except FileNotFoundError as e:
+                logger.error("Aborting : {}".format(e))
+                sys.exit(1)
+        return YAMLHelper.cache[conf]
+
+    @staticmethod
+    def analyse_keys(config_section, data_dict, expected_key_set):
+        diff = set(data_dict.keys()).difference(expected_key_set)
+        if len(diff) != 0:
+            raise TypeError(
+                "Unrecognized {} key(s). {} should not contain other keys than {}.".format(
+                    diff,
+                    config_section,
+                    expected_key_set,
+                )
+            )

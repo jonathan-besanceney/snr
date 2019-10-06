@@ -1,0 +1,210 @@
+database_helpers:
+  postgres:
+    env:
+      PGPASSWORD: '$password'
+    dump_command: [
+      '/usr/bin/pg_dump',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--dbname=$dbname'
+      ]
+    restore_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '$dbname'
+    ]
+    list_database_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--tuples-only',
+      '--command=SELECT datname FROM pg_database WHERE datname NOT IN (''postgres'', ''template1'', ''template0'');'
+    ]
+    create_database_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--command=CREATE DATABASE $dbname WITH OWNER = postgres ENCODING = ''UTF8'' CONNECTION LIMIT = -1;'
+    ]
+  mysql:
+    dump_command: [
+      '/usr/bin/mysqldump',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--password=$password',
+      '--default-character-set=utf8',
+      '$dbname'
+      ]
+    restore_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--password=$password',
+      '$dbname'
+    ]
+    list_database_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--password=$password',
+      '--execute=SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN (''information_schema'', ''mysql'', ''performance_schema'', ''sys'');',
+      '--batch',
+      '--silent'
+    ]
+    create_database_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--password=$password',
+      '--execute=CREATE DATABASE $dbname CHARACTER SET utf8 COLLATE utf8_general_ci;'
+    ]
+
+compression_helpers:
+  compressed_extention: tar.xz
+  compressed_from_pipe_ext: xz
+  compress_env:
+    XZ_OPT: "-e9 --threads=0"
+  compress_command: [
+    '/bin/tar',
+    '--create',
+    '--xz',
+    '--file',
+    '$destination',
+    '$file'
+  ]
+  compress_from_pipe: [
+    '/usr/bin/xz'
+  ]
+  decompress_command: [
+    '/bin/tar',
+    'xaf',
+    '$file',
+    '-C',
+    '/'
+  ]
+  decompress_to_pipe: [
+    '/usr/bin/xzcat',
+    '$file'
+  ]
+
+databases:
+  - instance: pg_bubblebox
+    type: postgres
+    host: 192.168.1.2
+    port: 5432
+    credentials: /home/jonathan/.pg_root
+  - instance: my_bubblebox
+    type: mysql
+    host: 192.168.1.2
+    port: 3306
+    credentials: /home/jonathan/.my_root
+
+apps:
+  - name: seafile
+    databases:
+      - name: ccnet
+        databaseName: ccnet-db
+        instance: my_bubblebox
+      - name: seafile
+        databaseName: seafile-db
+        instance: my_bubblebox
+      - name: seahub
+        databaseName: seahub-db
+        instance: my_bubblebox
+    files:
+        - name: data
+          hostPath: /mnt/data/volumes/seafile/data
+  - name: seafile-test-restore
+    databases:
+      - name: ccnet
+        databaseName: restore-ccnet
+        instance: my_bubblebox
+      - name: seafile
+        databaseName: restore-seafile
+        instance: my_bubblebox
+      - name: seahub
+        databaseName: restore-seahub
+        instance: my_bubblebox
+    files:
+      - name: data
+        hostPath: /home/jonathan/restore/seafile/data
+  - name: gitlab
+    databases:
+      - name: gitlab
+        databaseName: gitlab
+        instance: pg_bubblebox
+    files:
+      - name: data
+        hostPath: /mnt/data/volumes/gitlab/data
+
+saves:
+  - name: seafile
+    destination: '/mnt/saves/$app/$type/$name/$name-$date'
+    schedules:
+      - daily:
+        hour: "00:00"
+  - name: gitlab
+    destination: '/mnt/saves/$app/$type/$name/$name-$date'
+    schedules:
+      - daily:
+        hour: "00:00"
+
+retention:
+  databases:
+      days: 5
+      week: -1
+      month: 1
+      quarter: 1
+      year: 1
+  files:
+      days: 1
+      week: -1
+      month: -1
+      quarter: -1
+      year: -1
+
+log_path: /home/jonathan/.save/log
+logging:
+  version: 1
+  disable_existing_loggers: False
+  formatters:
+    simple:
+        format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: simple
+      stream: ext://sys.stdout
+
+    info_file_handler:
+      class: logging.handlers.RotatingFileHandler
+      level: INFO
+      formatter: simple
+      filename: info.log
+      maxBytes: 10485760 # 10MB
+      backupCount: 20
+      encoding: utf8
+
+    error_file_handler:
+      class: logging.handlers.RotatingFileHandler
+      level: ERROR
+      formatter: simple
+      filename: errors.log
+      maxBytes: 10485760 # 10MB
+      backupCount: 20
+      encoding: utf8
+
+  root:
+    level: INFO
+    handlers: [console, info_file_handler, error_file_handler]
