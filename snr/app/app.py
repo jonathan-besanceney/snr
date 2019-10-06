@@ -49,12 +49,15 @@ class App:
       - name: seafile
         databases:
           - name: ccnet
+            databasePrefix: restore_
             databaseName: ccnet-db
             instance: my_bubblebox
           - name: seafile
+            databasePrefix: restore_
             databaseName: seafile-db
             instance: my_bubblebox
           - name: seahub
+            databasePrefix: restore_
             databaseName: seahub-db
             instance: my_bubblebox
         files:
@@ -67,6 +70,7 @@ class App:
     C_NAME = 'name'
     C_DBS = 'databases'
     C_DB_NAME = 'name'
+    C_DATABASE_PREFIX = 'databasePrefix'
     C_DATABASE_NAME = 'databaseName'
     C_DB_INSTANCE = 'instance'
     C_DB_KEYS = {C_DB_NAME, C_DATABASE_NAME, C_DB_INSTANCE}
@@ -82,6 +86,16 @@ class App:
     C_ALL = ('All', )
 
     def __init__(self, name, databases, files, compression):
+        """
+        :param name: app name
+        :type name: str
+        :param databases: database list
+        :type databases: list
+        :param files: file dictionary
+        :type files: dict
+        :param compression: Compression helper
+        :type compression: Compression
+        """
         self._name = name
         self._databases = databases
         self._files = files
@@ -115,8 +129,12 @@ class App:
 
                 databases = list()
                 for db in app[App.C_DBS]:
+                    db_prefix = ""
+                    if App.C_DATABASE_PREFIX in db.keys():
+                        db_prefix = db[App.C_DATABASE_PREFIX]
                     databases.append(
                         {
+                            App.C_DATABASE_PREFIX: db_prefix,
                             App.C_DB_NAME: db[App.C_DB_NAME],
                             App.C_DATABASE_NAME: db[App.C_DATABASE_NAME],
                             App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]]
@@ -259,6 +277,66 @@ class App:
 
         return save_atoms
 
+    def _compare_file_list(self, file_list):
+        """
+        Compare provided file_list with current file list associated with this app.
+        Incomplete file_list is allowed.
+        :param file_list: list of file name to check
+        :type file_list: list
+        :return: True if list corresponds
+        :rtype: bool
+        """
+        app_db_list = set(self._files.keys())
+        diff = set(file_list).difference(app_db_list)
+        if len(diff) > 0:
+            logger.error(
+                "Provided file set to restore {} does not corresponds to this app file set {}".format(
+                    file_list,
+                    app_db_list
+                )
+            )
+            return False
+        return True
+
+    def _compare_db_list(self, db_list):
+        """
+        Compare provided db_list with current database list associated with this app.
+        Incomplete db_list is allowed.
+        :param db_list: list of db name to check
+        :type db_list: list
+        :return: True if list corresponds
+        :rtype: bool
+        """
+        app_db_list = list()
+        for d in self._databases:
+            app_db_list.append(d[App.C_DATABASE_NAME])
+
+        diff = set(db_list).difference(set(app_db_list))
+        if len(diff) > 0:
+            logger.error(
+                "Provided database set to restore {} does not corresponds to this app database set {}".format(
+                    db_list,
+                    app_db_list
+                )
+            )
+            return False
+        return True
+
+    def _get_database_attr(self, db_name, attr):
+        """
+        Returns Database attribute corresponding to db_name
+        :param db_name: name of the db from which get attribute
+        :type db_name: str
+        :return: attr
+        :rtype: Union[Database|str]
+        """
+        db_attr = None
+        for db in self._databases:
+            if db_name == db[App.C_DATABASE_NAME]:
+                db_attr = db[attr]
+
+        return db_attr
+
     def restore(self, save_atom, allow_status=AppSaveStatusEnum.FULL):
         """
 
@@ -280,14 +358,33 @@ class App:
             )
             return
 
+        if not self._compare_file_list(save_atom.files):
+            return
+
+        if not self._compare_db_list(save_atom.databases):
+            return
+
         threads = list()
         # file restore
         for f in save_atom.files:
-            pass
+            decompress = functools.partial(self._compression.decompress, save_atom.get_file(f), self._files[f])
+            t = Thread(target=decompress, name=f)
+            t.start()
+            threads.append(t)
 
         # database restore
         for d in save_atom.databases:
-            pass
+            db_instance = self._get_database_attr(d, App.C_DB_INSTANCE)
+            restore = functools.partial(
+                db_instance.restore,
+                d,
+                save_atom.get_database(d),
+                self._get_database_attr(d, App.C_DATABASE_PREFIX)
+
+            )
+            t = Thread(target=restore, name=d)
+            t.start()
+            threads.append(t)
 
         # wait for them
         for t in threads:

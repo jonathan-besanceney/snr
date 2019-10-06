@@ -177,7 +177,7 @@ class Database:
         logger.warning("Killing Database save process {}".format(self._dump_process.pid))
         self._dump_process.kill()
 
-    def _prepare_command(self, command, dbname=""):
+    def _prepare_command(self, command, dbname="", db_prefix=""):
         cmd = list()
         for arg in command:
             cmd.append(
@@ -186,7 +186,7 @@ class Database:
                     port=self._port,
                     username=self._username,
                     password=self._password,
-                    dbname=dbname
+                    dbname="{}{}".format(db_prefix, dbname)
                 )
             )
         return cmd
@@ -236,16 +236,16 @@ class Database:
         if not self._dump_process.stderr.closed:
             self._dump_process.stderr.close()
 
-    def restore(self, dbname, backup):
-        if dbname not in self._databases:
-            logger.warning("Database {} does not exist. Trying to create it.".format(dbname))
-            if not self.create_database(dbname):
+    def restore(self, dbname, backup, db_prefix=''):
+        if '{}{}'.format(db_prefix, dbname) not in self._databases:
+            logger.warning("Database {}{} does not exist. Trying to create it.".format(db_prefix, dbname))
+            if not self.create_database('{}{}'.format(db_prefix, dbname)):
                 return
 
         start = time.time()
 
         self._prepare_env()
-        cmd = self._prepare_command(self._restore_command, dbname)
+        cmd = self._prepare_command(self._restore_command, dbname, db_prefix)
 
         logger.info("starting {}".format(cmd))
         extract_process = self._compression.decompress_to_pipe(backup)
@@ -257,14 +257,14 @@ class Database:
 
         if restore_process.returncode == 0:
             if len(err) != 0:
-                logger.warning(err.decode())
+                logger.warning(err.decode().replace('\n', ''))
 
-            logger.info("restored {} in {:f}".format(dbname, time.time() - start))
+            logger.info("restored {}{} in {:f}".format(db_prefix, dbname, time.time() - start))
 
         else:
             logger.error(err.decode())
 
-    def create_database(self, dbname):
+    def create_database(self, dbname, db_prefix=''):
         if dbname in self.databases:
             logger.error("Can't create database '{}'. This database already exist !".format(dbname))
             return False
@@ -273,7 +273,7 @@ class Database:
         self._databases = list()
 
         self._prepare_env()
-        cmd = self._prepare_command(self._create_database_command, dbname)
+        cmd = self._prepare_command(self._create_database_command, dbname, db_prefix)
         p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         self._restore_env()
 

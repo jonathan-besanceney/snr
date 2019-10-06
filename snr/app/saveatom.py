@@ -72,6 +72,7 @@ class SaveAtom:
         self._databases[name] = item
 
     def del_database(self, name):
+        self._status = AppSaveStatusEnum.UNDEFINED
         if name in self._databases.keys():
             del self._databases[name]
 
@@ -92,6 +93,7 @@ class SaveAtom:
         self._files[name] = item
 
     def del_file(self, name):
+        self._status = AppSaveStatusEnum.UNDEFINED
         if name in self._files.keys():
             del self._files[name]
 
