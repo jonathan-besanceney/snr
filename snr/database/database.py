@@ -203,8 +203,8 @@ class Database:
             for env in self._env.keys():
                 del os.environ[env]
 
-    def save(self, dbname, file):
-        if dbname not in self._databases:
+    def save(self, dbname, file, db_prefix=""):
+        if '{}{}'.format(db_prefix, dbname) not in self.databases:
             logger.error("Can't save database '{}'. This database does not exist !".format(dbname))
             return
 
@@ -237,7 +237,7 @@ class Database:
             self._dump_process.stderr.close()
 
     def restore(self, dbname, backup, db_prefix=''):
-        if '{}{}'.format(db_prefix, dbname) not in self._databases:
+        if '{}{}'.format(db_prefix, dbname) not in self.databases:
             logger.warning("Database {}{} does not exist. Trying to create it.".format(db_prefix, dbname))
             if not self.create_database('{}{}'.format(db_prefix, dbname)):
                 return

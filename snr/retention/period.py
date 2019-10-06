@@ -63,11 +63,11 @@ class Period:
         self._duration = duration
         self._latest = latest
 
-        if self._duration == 1:
+        if duration == PeriodDurationEnum.DAY:
             self._latest = True
-        self._end = start - timedelta(days=duration.value)
+        self._end = start - timedelta(days=self._duration.value)
         logger.info(
-            "{} day(s) Period initialized from {} to {}. Select latest file {}".format(
+            "{} Period initialized from {} to {}. Select latest file {}".format(
                 duration, start, self._end, self._latest
             )
         )
@@ -141,9 +141,7 @@ class Period:
                     selected_file = file
 
         if selected_file != "":
-            logger.info("{} day(s) Period, keeping {} ! ".format(self._duration, selected_file))
-        else:
-            logger.warning("{} day(s) Period, NO FILE TO KEEP !".format(self._duration))
+            logger.info("{} Period, keeping {} ".format(self._duration, selected_file))
 
         return selected_file
 
@@ -169,6 +167,7 @@ class Periods:
         self._period_list = list()
 
         period_start = datetime.today()
+
         i = 0
         while i < self._number_of_period:
             p_instance = Period.get_instance(period_start, self._period_length)
@@ -203,14 +202,14 @@ class Periods:
         :param file_dict: file dictionary
         :type file_dict: dict
         :return: matching file list
-        :rtype: list
+        :rtype: set
         """
 
-        selected_file_list = list()
+        selected_file_list = set()
 
         for p in self._period_list:
             selected_file = p.get_matching_file(file_dict)
             if selected_file != "":
-                selected_file_list.append(selected_file)
+                selected_file_list.add(selected_file)
 
         return selected_file_list

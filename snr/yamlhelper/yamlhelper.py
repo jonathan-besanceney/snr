@@ -43,22 +43,41 @@ class YAMLHelper:
     cache = dict()
 
     @staticmethod
-    def load(conf, reload=False):
-        if conf not in YAMLHelper.cache.keys() or reload:
+    def load(file, reload=False):
+        """
+        Load YAML file and returns data dict
+        :param file: YAML data filepath
+        :type file: str
+        :param reload: Optional. Reset cache
+        :type reload: bool
+        :return: data dictionary
+        :rtype: dict
+        """
+        if file not in YAMLHelper.cache.keys() or reload:
             try:
-                with open(conf, 'r') as f:
+                with open(file, 'r') as f:
                     data = load(f, Loader=Loader)
-                YAMLHelper.cache[conf] = data
+                YAMLHelper.cache[file] = data
             except (ParserError, YAMLError) as e:
                 logger.error("Aborting : {}".format(e))
                 sys.exit(1)
             except FileNotFoundError as e:
                 logger.error("Aborting : {}".format(e))
                 sys.exit(1)
-        return YAMLHelper.cache[conf]
+        return YAMLHelper.cache[file]
 
     @staticmethod
     def analyse_keys(config_section, data_dict, expected_key_set):
+        """
+        Watch for dict key set differences
+        :param config_section:
+        :type config_section: str
+        :param data_dict: data dictionary to check
+        :type data_dict: dict
+        :param expected_key_set: Expected set of key
+        :type expected_key_set: set
+        :raise: TypeError if key set is different than expected_key_set
+        """
         diff = set(data_dict.keys()).difference(expected_key_set)
         if len(diff) != 0:
             raise TypeError(

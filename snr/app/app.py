@@ -216,7 +216,12 @@ class App:
                         db[App.C_DB_NAME],
                         self._compression.get_file_with_compressed_from_pipe_ext(save_path)
                     )
-                    save = functools.partial(db[App.C_DB_INSTANCE].save, db[App.C_DATABASE_NAME], save_path)
+                    save = functools.partial(
+                        db[App.C_DB_INSTANCE].save,
+                        db[App.C_DATABASE_NAME],
+                        save_path,
+                        self._get_database_attr(db, App.C_DATABASE_PREFIX)
+                    )
                     t = Thread(target=save, name=db[App.C_DB_NAME])
                     t.start()
                     db_threads.append(t)
@@ -330,7 +335,7 @@ class App:
         :return: attr
         :rtype: Union[Database|str]
         """
-        db_attr = None
+        db_attr = ""
         for db in self._databases:
             if db_name == db[App.C_DATABASE_NAME]:
                 db_attr = db[attr]
@@ -380,7 +385,6 @@ class App:
                 d,
                 save_atom.get_database(d),
                 self._get_database_attr(d, App.C_DATABASE_PREFIX)
-
             )
             t = Thread(target=restore, name=d)
             t.start()
