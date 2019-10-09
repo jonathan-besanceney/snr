@@ -48,8 +48,6 @@ class Period:
     Period definition.
     """
 
-    cache = dict()
-
     def __init__(self, start, duration, latest=False):
         """
         :param start: datetime for the day
@@ -75,24 +73,6 @@ class Period:
     @staticmethod
     def cache_reset():
         Period.cache.clear()
-
-    @staticmethod
-    def get_instance(start, duration, latest=False):
-        """
-        Factory. Caches instance of Period
-        :param start: datetime for the day
-        :type start: datetime
-        :param duration: number of days of this Period
-        :type duration: snr.retention.period.PeriodDurationEnum
-        :param latest: optional. Select earliest per default, except for one day duration
-        :type latest: bool
-        """
-        key = "{}-{}-{}".format(str(start), str(duration), str(latest))
-        if key not in Period.cache:
-            period = Period(start, duration, latest=False)
-            Period.cache[key] = period
-
-        return Period.cache[key]
 
     @property
     def start(self):
@@ -141,7 +121,7 @@ class Period:
                     selected_file = file
 
         if selected_file != "":
-            logger.info("{} Period, keeping {} ".format(self._duration, selected_file))
+            logger.debug("{} Period, keeping {} ".format(self._duration, selected_file))
 
         return selected_file
 
@@ -151,13 +131,10 @@ class Periods:
     Defines Period.
     """
 
-    cache_date = date.today()
-    cache = dict()
-
     def __init__(self, period_length, number_of_period):
         """
         :param period_length: length in days
-        :type period_length: int
+        :type period_length: PeriodDurationEnum
         :param number_of_period: how many period instanciate from now
         :type number_of_period: int
         """
@@ -170,32 +147,10 @@ class Periods:
 
         i = 0
         while i < self._number_of_period:
-            p_instance = Period.get_instance(period_start, self._period_length)
+            p_instance = Period(period_start, self._period_length)
             self._period_list.append(p_instance)
             period_start = p_instance.end
             i += 1
-
-    @staticmethod
-    def get_instance(period_length, number_of_period):
-        """
-        :param period_length: length in days
-        :type period_length: int
-        :param number_of_period: how many period instanciate from now
-        :type number_of_period: int
-        """
-        key = '{}-{}'.format(str(period_length), str(number_of_period))
-
-        # makes cache lives for one day
-        today = date.today()
-        if Periods.cache_date != today:
-            Period.cache_reset()
-            if key in Periods.cache.keys():
-                del Periods.cache[key]
-
-        if key not in Periods.cache.keys():
-            Periods.cache[key] = Periods(period_length, number_of_period)
-
-        return Periods.cache[key]
 
     def get_matching_files_list(self, file_dict):
         """

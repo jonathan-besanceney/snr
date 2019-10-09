@@ -70,11 +70,11 @@ class Retention:
 
     def __init__(self, name, last_days=5, last_weeks=1, last_months=-1, last_quarters=1, last_years=1):
         self._name = name
-        self.last_days = Periods.get_instance(PeriodDurationEnum.DAY, last_days)
-        self.last_weeks = Periods.get_instance(PeriodDurationEnum.WEEK, last_weeks)
-        self.last_months = Periods.get_instance(PeriodDurationEnum.MONTH, last_months)
-        self.last_quarters = Periods.get_instance(PeriodDurationEnum.QUARTER, last_quarters)
-        self.last_years = Periods.get_instance(PeriodDurationEnum.YEAR, last_years)
+        self.last_days = Periods(PeriodDurationEnum.DAY, last_days)
+        self.last_weeks = Periods(PeriodDurationEnum.WEEK, last_weeks)
+        self.last_months = Periods(PeriodDurationEnum.MONTH, last_months)
+        self.last_quarters = Periods(PeriodDurationEnum.QUARTER, last_quarters)
+        self.last_years = Periods(PeriodDurationEnum.YEAR, last_years)
 
     @staticmethod
     def get_retentions(conf):
@@ -119,15 +119,13 @@ class Retention:
         for root, _, files in os.walk(path):
             for file in files:
                 file = os.path.join(root, file)
-                if not os.path.islink(file):
+                if os.path.isfile(file) and not os.path.islink(file):
                     ext = os.path.splitext(file)
                     if ext[1] == ".xz" or ext[1] == ".tar.xz":
                         if root not in all_files:
                             all_files[root] = dict()
 
                         all_files[root][file] = datetime.fromtimestamp(os.path.getctime(file))
-                else:
-                    logger.warning("Skipping link {}".format(file))
         return all_files
 
     def _get_matching_files(self, all_files):
@@ -136,7 +134,7 @@ class Retention:
         :param all_files: dictionary of wanted files
         :type all_files: dict
         :return: list of files to keep
-        :rtype: list
+        :rtype: set
         """
         all_wanted_file = set()
         for path in all_files.keys():
@@ -149,30 +147,23 @@ class Retention:
         return all_wanted_file
 
     @staticmethod
-    def _remove_unwanted_files(path, wanted_files):
+    def _remove_unwanted_files(files, wanted_files):
         """
         Delete all files not in wanted list
-        :param path: path to clean
-        :type path: str
+        :param files: all save files
+        :type files: dict
         :param wanted_files: files to keep
-        :type wanted_files: list
+        :type wanted_files: set
         """
-
-        for root, _, files in os.walk(path):
-            for file in files:
-                file = os.path.join(root, file)
-                if not os.path.islink(file):
-                    ext = os.path.splitext(file)
-                    if ext[1] == ".xz" or ext[1] == ".tar.xz":
-                        if file not in wanted_files:
-                            logger.info("Deleting {}".format(file))
-                            os.remove(file)
-                else:
-                    logger.warning("Skipping link {}".format(file))
+        for path in files.keys():
+            del_files = set(files[path].keys()).difference(wanted_files)
+            for file in del_files:
+                logger.info("Deleting {}".format(file))
+                os.remove(file)
 
     def run(self, path):
         logger.info("Starting retention on {}".format(path))
-        all_files = Retention._make_file_dict(path)
-        all_wanted_files = self._get_matching_files(all_files)
-        Retention._remove_unwanted_files(path, all_wanted_files)
+        files = Retention._make_file_dict(path)
+        wanted_files = self._get_matching_files(files)
+        Retention._remove_unwanted_files(files, wanted_files)
 
