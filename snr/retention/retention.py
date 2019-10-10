@@ -77,7 +77,7 @@ class Retention:
         self.last_years = Periods(PeriodDurationEnum.YEAR, last_years)
 
     @staticmethod
-    def get_retentions(conf):
+    def get_instances(conf):
         """
         Load Retention configuration and return Retention instances
         :param conf: file path to load

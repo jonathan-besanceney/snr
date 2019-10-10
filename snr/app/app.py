@@ -112,14 +112,14 @@ class App:
         self._save_atom = SaveAtom(db_names, file_names)
 
     @staticmethod
-    def get_app(conf):
+    def get_instances(conf):
         try:
             data = YAMLHelper.load(conf)
 
-            db_instances = Database.get_databases(conf)
+            db_instances = Database.get_instances(conf)
             if db_instances is None:
                 raise TypeError("Error getting databases.")
-            compression = Compression.get_compression(conf)
+            compression = Compression.get_instance(conf)
             if compression is None:
                 raise TypeError("Error getting compression object.")
 

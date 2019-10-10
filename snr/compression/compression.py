@@ -109,7 +109,7 @@ compression_helpers:
         return "{}.{}".format(file, self._compressed_from_pipe_ext)
 
     @staticmethod
-    def get_compression(conf):
+    def get_instance(conf):
         """
         Compression class Factory. Instances are cached by 'conf' parameter.
         :param conf: path to Yaml configuration

@@ -120,7 +120,7 @@ class Database:
         self._databases = list()
 
     @staticmethod
-    def get_databases(conf):
+    def get_instances(conf):
         try:
             data = YAMLHelper.load(conf)
 
@@ -157,7 +157,7 @@ class Database:
                     helpers[db[Database.D_TYPE]][Database.H_CREATE_DB],
                     username,
                     password,
-                    Compression.get_compression(conf),
+                    Compression.get_instance(conf),
                     env
                 )
 
