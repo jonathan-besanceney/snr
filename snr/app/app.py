@@ -312,16 +312,16 @@ class App:
         :return: True if list corresponds
         :rtype: bool
         """
-        app_db_list = list()
+        app_dbs = set()
         for d in self._databases:
-            app_db_list.append(d[App.C_DATABASE_NAME])
+            app_dbs.add(d[App.C_DATABASE_NAME])
 
-        diff = set(db_list).difference(set(app_db_list))
+        diff = set(db_list).difference(app_dbs)
         if len(diff) > 0:
             logger.error(
                 "Provided database set to restore {} does not corresponds to this app database set {}".format(
                     db_list,
-                    app_db_list
+                    app_dbs
                 )
             )
             return False

@@ -40,36 +40,37 @@ logger = logging.getLogger(__name__)
 
 class Compression:
     """
-    Compression helper factory. Configured through yaml config file via compression_helpers key :
+    Compression helper factory. Configured through yaml config file via compression_helpers key
+    """
 
-    compression_helpers:
-      compressed_extention: tar.xz
-      compressed_from_pipe_ext: xz
-      compress_env:
-        XZ_OPT: "-e9 --threads=0"
-      compress_command: [
-        '/bin/tar',
-        '--absolute-names',
-        '--create',
-        '--xz',
-        '--file',
-        '$destination',
-        '$file'
-      ]
-      compress_from_pipe: [
-        '/usr/bin/xz'
-      ]
-      decompress_command: [
-        '/bin/tar',
-        'xaf',
-        '$file',
-        '-C',
-        '/'
-      ]
-      decompress_to_pipe: [
-        '/usr/bin/xzcat',
-        '$file'
-      ]
+    C_YAML = """
+compression_helpers:
+  compressed_extention: tar.xz
+  compressed_from_pipe_ext: xz
+  compress_env:
+    XZ_OPT: "-e9 --threads=0"
+  compress_command: [
+    '/bin/tar',
+    '--create',
+    '--xz',
+    '--file',
+    '$destination',
+    '$file'
+  ]
+  compress_from_pipe: [
+    '/usr/bin/xz'
+  ]
+  decompress_command: [
+    '/bin/tar',
+    'xaf',
+    '$file',
+    '-C',
+    '/'
+  ]
+  decompress_to_pipe: [
+    '/usr/bin/xzcat',
+    '$file'
+  ]
     """
 
     cache = dict()
@@ -313,3 +314,4 @@ class Compression:
 
         logger.error(p)
         return None
+
