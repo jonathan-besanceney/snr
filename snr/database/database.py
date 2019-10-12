@@ -85,7 +85,8 @@ class Database:
     H_RESTORE = 'restore_command'
     H_LIST_DB = 'list_database_command'
     H_CREATE_DB = 'create_database_command'
-    HELPER_KEYS = {H_ENV, H_RESTORE, H_DUMP, H_LIST_DB, H_CREATE_DB}
+    HELPER_KEYS = {H_RESTORE, H_DUMP, H_LIST_DB, H_CREATE_DB}
+    HELPER_OPTIONAL_KEYS = {H_ENV}
     DBS = 'databases'
     D_INSTANCE = 'instance'
     D_TYPE = 'type'
@@ -127,7 +128,12 @@ class Database:
             helpers = dict()
             for db_type in data[Database.HELPERS]:
                 # Validate configuration keys
-                YAMLHelper.analyse_keys(Database.HELPERS, data[Database.HELPERS][db_type], Database.HELPER_KEYS)
+                YAMLHelper.analyse_keys(
+                    Database.HELPERS,
+                    data[Database.HELPERS][db_type],
+                    Database.HELPER_KEYS,
+                    Database.HELPER_OPTIONAL_KEYS
+                )
 
                 helpers[db_type] = data[Database.HELPERS][db_type]
 

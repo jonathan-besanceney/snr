@@ -74,6 +74,7 @@ class App:
     C_DATABASE_NAME = 'databaseName'
     C_DB_INSTANCE = 'instance'
     C_DB_KEYS = {C_DB_NAME, C_DATABASE_NAME, C_DB_INSTANCE}
+    C_DB_OPTIONAL_KEYS = {C_DATABASE_PREFIX}
     C_FILES = 'files'
     C_FILE_NAME = 'name'
     C_FILE_PATH = 'hostPath'
@@ -125,10 +126,13 @@ class App:
 
             apps = dict()
             for app in data[App.C_APPS]:
-                YAMLHelper.analyse_keys(App.C_APPS, app, App.C_APP_KEYS)
+                # an app may not contain database or file
+                YAMLHelper.analyse_keys(App.C_APPS, app, optional_key_set=App.C_APP_KEYS)
 
                 databases = list()
                 for db in app[App.C_DBS]:
+                    YAMLHelper.analyse_keys(App.C_DBS, db, App.C_DB_KEYS, App.C_DB_OPTIONAL_KEYS)
+
                     db_prefix = ""
                     if App.C_DATABASE_PREFIX in db.keys():
                         db_prefix = db[App.C_DATABASE_PREFIX]
@@ -143,6 +147,7 @@ class App:
 
                 files = dict()
                 for dirs in app[App.C_FILES]:
+                    YAMLHelper.analyse_keys(App.C_FILES, dirs, App.C_FILE_KEYS)
                     files[dirs[App.C_FILE_NAME]] = dirs[App.C_FILE_PATH]
 
                 apps[app[App.C_NAME]] = App(
