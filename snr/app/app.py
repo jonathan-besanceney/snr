@@ -52,14 +52,17 @@ class App:
             databasePrefix: restore_
             databaseName: ccnet-db
             instance: my_bubblebox
+            credentials:
           - name: seafile
             databasePrefix: restore_
             databaseName: seafile-db
             instance: my_bubblebox
+            credentials:
           - name: seahub
             databasePrefix: restore_
             databaseName: seahub-db
             instance: my_bubblebox
+            credentials:
         files:
             - name: data
               hostPath: /mnt/data0/volumes/seafile/data
@@ -74,7 +77,8 @@ class App:
     C_DATABASE_NAME = 'databaseName'
     C_DB_INSTANCE = 'instance'
     C_DB_KEYS = {C_DB_NAME, C_DATABASE_NAME, C_DB_INSTANCE}
-    C_DB_OPTIONAL_KEYS = {C_DATABASE_PREFIX}
+    C_DB_OPTIONAL_KEYS = {C_DATABASE_PREFIX, Database.D_CREDS}
+
     C_FILES = 'files'
     C_FILE_NAME = 'name'
     C_FILE_PATH = 'hostPath'
@@ -136,12 +140,18 @@ class App:
                     db_prefix = ""
                     if App.C_DATABASE_PREFIX in db.keys():
                         db_prefix = db[App.C_DATABASE_PREFIX]
+                    credentials = ""
+                    if Database.D_CREDS in db.keys():
+                        credentials = YAMLHelper.load(db[Database.D_CREDS])
+                        YAMLHelper.analyse_keys(db[Database.D_CREDS], credentials, Database.C_KEYS)
+
                     databases.append(
                         {
                             App.C_DATABASE_PREFIX: db_prefix,
                             App.C_DB_NAME: db[App.C_DB_NAME],
                             App.C_DATABASE_NAME: db[App.C_DATABASE_NAME],
-                            App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]]
+                            App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]],
+                            Database.D_CREDS: credentials
                         }
                     )
 
@@ -268,7 +278,7 @@ class App:
 
         return save_atoms
 
-    def list_saves(self, source):
+    def get_saves(self, source):
         """
         List all saves for this app from source path. Returns a dictionary organized by date (in str).
         See C_DATE_FORMAT for dictionary keys generation.
@@ -362,7 +372,7 @@ class App:
             logger.error("restore({}) : Save atom is undefined !")
         if save_atom.status != AppSaveStatusEnum.FULL and save_atom.status != allow_status:
             logger.error(
-                "restore({}) : The selected save is {}, you must set allow_partial to allow a restore.".format(
+                "restore({}) : The selected save is {}, you must set allow_status=AppSaveStatusEnum.PARTIAL to allow a restore.".format(
                     save_atom, save_atom.status
                 )
             )
@@ -377,10 +387,12 @@ class App:
         threads = list()
         # file restore
         for f in save_atom.files:
-            decompress = functools.partial(self._compression.decompress, save_atom.get_file(f), self._files[f])
-            t = Thread(target=decompress, name=f)
-            t.start()
-            threads.append(t)
+            # avoid null file path
+            if save_atom.get_file(f):
+                decompress = functools.partial(self._compression.decompress, save_atom.get_file(f), self._files[f])
+                t = Thread(target=decompress, name=f)
+                t.start()
+                threads.append(t)
 
         # database restore
         for d in save_atom.databases:
@@ -389,7 +401,8 @@ class App:
                 db_instance.restore,
                 d,
                 save_atom.get_database(d),
-                self._get_database_attr(d, App.C_DATABASE_PREFIX)
+                self._get_database_attr(d, App.C_DATABASE_PREFIX),
+                self._get_database_attr(d, Database.D_CREDS)
             )
             t = Thread(target=restore, name=d)
             t.start()

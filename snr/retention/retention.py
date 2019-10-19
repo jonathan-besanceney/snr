@@ -77,6 +77,44 @@ class Retention:
         self.last_years = Periods(PeriodDurationEnum.YEAR, last_years)
 
     @staticmethod
+    def get_instance(conf, name):
+        """
+        Load Retention configuration and return Retention named instance
+        :param conf: file path to load
+        :type conf: str
+        :param name: name of the instance to instanciate
+        :type name: str
+        :return: Retention instance
+        :rtype: Retention
+        """
+        try:
+            data = YAMLHelper.load(conf)
+            instance = None
+            names = set()
+            for retention in data[Retention.C_RETENTION]:
+                YAMLHelper.analyse_keys(
+                    Retention.C_RETENTION, retention, Retention.C_RETENTION_KEYS
+                )
+                names.add(retention[Retention.C_RETENTION_NAME])
+
+                if retention[Retention.C_RETENTION_NAME] == name:
+                    instance = Retention(
+                        retention[Retention.C_RETENTION_NAME],
+                        retention[Retention.C_RETENTION_DAYS],
+                        retention[Retention.C_RETENTION_WEEKS],
+                        retention[Retention.C_RETENTION_MONTHS],
+                        retention[Retention.C_RETENTION_QUARTERS],
+                        retention[Retention.C_RETENTION_YEARS],
+                    )
+            if instance is None:
+                logger.error("Retention {} does not exist. You must select one of {}".format(name, names))
+            return instance
+        except IOError:
+            logger.error("{} does not exist".format(conf))
+        except (TypeError, KeyError) as e:
+            logger.error("Cannot initialize retention : {}".format(e))
+
+    @staticmethod
     def get_instances(conf):
         """
         Load Retention configuration and return Retention instances

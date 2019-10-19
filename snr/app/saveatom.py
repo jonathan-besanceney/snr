@@ -27,8 +27,10 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with docker.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+import os
 import pprint
 from enum import Enum
+from pathlib import Path
 
 
 class AppSaveStatusEnum(Enum):
@@ -43,9 +45,11 @@ class SaveAtom:
         self._databases = dict()
         if databases:
             self.databases = databases
+        self._databases_root_path = None
         self._files = dict()
         if files:
             self.files = files
+        self._files_root_path = None
         self._status = AppSaveStatusEnum.UNDEFINED
 
     def clone(self):
@@ -70,6 +74,8 @@ class SaveAtom:
     def set_database(self, name, item):
         self._status = AppSaveStatusEnum.UNDEFINED
         self._databases[name] = item
+        if not self.databases_root_path:
+            self.databases_root_path = str(Path(os.path.split(item)[0]).parent)
 
     def del_database(self, name):
         self._status = AppSaveStatusEnum.UNDEFINED
@@ -85,12 +91,23 @@ class SaveAtom:
         self._status = AppSaveStatusEnum.UNDEFINED
         self._databases.update(dict((db, None) for db in dbs))
 
+    @property
+    def databases_root_path(self):
+        return self._databases_root_path
+
+    @databases_root_path.setter
+    def databases_root_path(self, root_path):
+        if self._databases_root_path != root_path:
+            self._databases_root_path = root_path
+
     def get_file(self, name):
         return self._files[name]
 
     def set_file(self, name, item):
         self._status = AppSaveStatusEnum.UNDEFINED
         self._files[name] = item
+        if not self._files_root_path:
+            self.files_root_path = str(Path(os.path.split(item)[0]).parent)
 
     def del_file(self, name):
         self._status = AppSaveStatusEnum.UNDEFINED
@@ -105,6 +122,15 @@ class SaveAtom:
     def files(self, files):
         self._status = AppSaveStatusEnum.UNDEFINED
         self._files.update(dict((f, None) for f in files))
+
+    @property
+    def files_root_path(self):
+        return self._files_root_path
+
+    @files_root_path.setter
+    def files_root_path(self, root_path):
+        if self._files_root_path != root_path:
+            self._files_root_path = root_path
 
     @property
     def status(self):
@@ -131,7 +157,9 @@ class SaveAtom:
             {
                 'date': self._date,
                 'databases': self._databases,
+                'databases_root_path': self._databases_root_path,
                 'files': self._files,
+                'files_root_path': self._files_root_path,
                 'status': self.status.value
             }
         )

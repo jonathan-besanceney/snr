@@ -27,7 +27,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with docker.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
-from snr.app.saveatom import SaveAtom
+from snr.app.saveatom import SaveAtom, AppSaveStatusEnum
 from snr.app.app import App
 
-__all__ = ["SaveAtom", "App"]
+__all__ = ["SaveAtom", "App", "AppSaveStatusEnum"]

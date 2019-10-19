@@ -29,11 +29,11 @@
 # ------------------------------------------------------------------------------
 import sys
 import logging
-from yaml import load, YAMLError
+from yaml import load, dump, YAMLError
 try:
-    from yaml import CLoader as Loader
+    from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
-    from yaml import Loader
+    from yaml import Loader, Dumper
 from yaml.parser import ParserError
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,10 @@ class YAMLHelper:
                 logger.error("Aborting : {}".format(e))
                 sys.exit(1)
         return YAMLHelper.cache[file]
+
+    @staticmethod
+    def dump(obj):
+        return dump(obj, Dumper=Dumper)
 
     @staticmethod
     def analyse_keys(config_section, data_dict, mandatory_key_set=None, optional_key_set={}):

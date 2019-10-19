@@ -80,12 +80,15 @@ class Database:
 
     """
     HELPERS = 'database_helpers'
+    HELPERS_KEYS = {'postgres', 'mysql'}
+
     H_ENV = 'env'
     H_DUMP = 'dump_command'
     H_RESTORE = 'restore_command'
     H_LIST_DB = 'list_database_command'
     H_CREATE_DB = 'create_database_command'
-    HELPER_KEYS = {H_RESTORE, H_DUMP, H_LIST_DB, H_CREATE_DB}
+    H_CREATE_USER = 'create_user_and_assign_command'
+    HELPER_KEYS = {H_RESTORE, H_DUMP, H_LIST_DB, H_CREATE_DB, H_CREATE_USER}
     HELPER_OPTIONAL_KEYS = {H_ENV}
     DBS = 'databases'
     D_INSTANCE = 'instance'
@@ -93,7 +96,7 @@ class Database:
     D_HOST = 'host'
     D_PORT = 'port'
     D_CREDS = 'credentials'
-    DB_KEYS = {D_INSTANCE, D_TYPE, D_HOST, D_PORT, D_CREDS}
+    D_INSTANCE_KEYS = {D_INSTANCE, D_TYPE, D_HOST, D_PORT, D_CREDS}
     C_USER = 'username'
     C_PASS = 'password'
     C_KEYS = {C_USER, C_PASS}
@@ -101,6 +104,7 @@ class Database:
     def __init__(
             self, instance, db_type, host, port, credentials,
             dump_command, restore_command, list_databases_command, create_database_command,
+            create_user_and_assign_command,
             username, password,
             compression, env=None
     ):
@@ -113,6 +117,7 @@ class Database:
         self._restore_command = restore_command
         self._list_databases_command = list_databases_command
         self._create_database_command = create_database_command
+        self._create_user_and_assign_command = create_user_and_assign_command
         self._username = username
         self._password = password
         self._compression = compression
@@ -125,9 +130,16 @@ class Database:
         try:
             data = YAMLHelper.load(conf)
 
+            # validate *helpers* keys
+            YAMLHelper.analyse_keys(
+                Database.HELPERS,
+                data[Database.HELPERS],
+                optional_key_set=Database.HELPERS_KEYS
+            )
+
             helpers = dict()
             for db_type in data[Database.HELPERS]:
-                # Validate configuration keys
+                # Validate helper configuration keys
                 YAMLHelper.analyse_keys(
                     Database.HELPERS,
                     data[Database.HELPERS][db_type],
@@ -139,7 +151,7 @@ class Database:
 
             databases = dict()
             for db in data[Database.DBS]:
-                YAMLHelper.analyse_keys(Database.DBS, db, Database.DB_KEYS)
+                YAMLHelper.analyse_keys(Database.DBS, db, Database.D_INSTANCE_KEYS)
 
                 env = None
                 if Database.H_ENV in helpers[db[Database.D_TYPE]].keys():
@@ -161,6 +173,7 @@ class Database:
                     helpers[db[Database.D_TYPE]][Database.H_RESTORE],
                     helpers[db[Database.D_TYPE]][Database.H_LIST_DB],
                     helpers[db[Database.D_TYPE]][Database.H_CREATE_DB],
+                    helpers[db[Database.D_TYPE]][Database.H_CREATE_USER],
                     username,
                     password,
                     Compression.get_instance(conf),
@@ -183,7 +196,7 @@ class Database:
         logger.warning("Killing Database save process {}".format(self._dump_process.pid))
         self._dump_process.kill()
 
-    def _prepare_command(self, command, dbname="", db_prefix=""):
+    def _prepare_command(self, command, dbname="", db_prefix="", user="", passwd=""):
         cmd = list()
         for arg in command:
             cmd.append(
@@ -192,7 +205,9 @@ class Database:
                     port=self._port,
                     username=self._username,
                     password=self._password,
-                    dbname="{}{}".format(db_prefix, dbname)
+                    dbname="{}{}".format(db_prefix, dbname),
+                    user=user,
+                    passwd=passwd
                 )
             )
         return cmd
@@ -207,7 +222,9 @@ class Database:
     def _restore_env(self):
         if self._env:
             for env in self._env.keys():
-                del os.environ[env]
+                # mysql deletes MYSQL_PWD when terminate
+                if env in os.environ.keys():
+                    del os.environ[env]
 
     def save(self, dbname, file, db_prefix=""):
         if '{}{}'.format(db_prefix, dbname) not in self.databases:
@@ -242,11 +259,20 @@ class Database:
         if not self._dump_process.stderr.closed:
             self._dump_process.stderr.close()
 
-    def restore(self, dbname, backup, db_prefix=''):
+    def restore(self, dbname, backup, db_prefix='', credentials=None):
         if '{}{}'.format(db_prefix, dbname) not in self.databases:
             logger.warning("Database {}{} does not exist. Trying to create it.".format(db_prefix, dbname))
-            if not self.create_database('{}{}'.format(db_prefix, dbname)):
+            if not self.create_database(dbname, db_prefix):
                 return
+
+            if credentials:
+                if not self.create_user(
+                        credentials[Database.C_USER],
+                        credentials[Database.C_PASS],
+                        dbname,
+                        db_prefix
+                ):
+                    return
 
         start = time.time()
 
@@ -271,8 +297,8 @@ class Database:
             logger.error(err.decode())
 
     def create_database(self, dbname, db_prefix=''):
-        if dbname in self.databases:
-            logger.error("Can't create database '{}'. This database already exist !".format(dbname))
+        if '{}{}'.format(db_prefix, dbname) in self.databases:
+            logger.error("Can't create database '{}{}'. This database already exist !".format(db_prefix, dbname))
             return False
 
         # reset db list
@@ -284,7 +310,20 @@ class Database:
         self._restore_env()
 
         if p.returncode == 0:
-            logger.warning("Database '{}' created".format(dbname))
+            logger.warning("Database '{}{}' created".format(db_prefix, dbname))
+            return True
+        else:
+            logger.error(p.stderr.decode())
+            return False
+
+    def create_user(self, user, passwd, dbname, db_prefix=''):
+        self._prepare_env()
+        cmd = self._prepare_command(self._create_user_and_assign_command, dbname, db_prefix, user, passwd)
+        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        self._restore_env()
+
+        if p.returncode == 0:
+            logger.warning("User '{}' created".format(user))
             return True
         else:
             logger.error(p.stderr.decode())
