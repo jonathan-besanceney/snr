@@ -36,7 +36,7 @@ setup(
     author='Jonathan Besanceney',
     author_email='jonathan.besanceney@gmail.com',
     description='Closure Tree implementation',
-    install_requires=['PyYAML', 'PyInstaller'],
+    install_requires=['PyYAML', 'PyInstaller', 'schedule'],
     dependency_links=[
         "git+https://***REMOVED***@***REMOVED***/gitlab/projet8/logger.git#egg=logger"
     ],

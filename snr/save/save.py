@@ -29,6 +29,9 @@
 # ------------------------------------------------------------------------------
 import logging
 import time
+from threading import Thread
+
+import schedule
 
 from snr.app import App
 from snr.app.saveatom import AppSaveStatusEnum
@@ -38,7 +41,7 @@ from snr.yamlhelper import YAMLHelper
 logger = logging.getLogger(__name__)
 
 
-class Save:
+class Save(Thread):
     """
 
     """
@@ -75,7 +78,7 @@ saves:
     C_SAVE_RETENTION_FILES = 'files'
     C_SAVE_RETENTION_OPT_KEYS = {C_SAVE_RETENTION_DBS, C_SAVE_RETENTION_FILES}
 
-    def __init__(self, name, destination, retentions, schedules, app, daemon, conf):
+    def __init__(self, name, destination, retentions, schedules, app, conf):
         """
 
         :param name:
@@ -88,28 +91,37 @@ saves:
         :type schedules: dict
         :param app: App
         :type app: App
-        :param daemon: if true makes app run in a thread and wake up at scheduled events
-        :type daemon: bool
         :param conf: conf file
         :type conf: str
         """
+        super(Save, self).__init__()
         self._name = name
 
         self._destination = destination
         self._retentions = retentions
         self._schedules = schedules
         self._app = app
-        self._daemon = daemon
         self._conf = conf
+        self._run = True
+
+    def run(self) -> None:
+        logger.info("Starting schedule thread")
+        while self._run:
+            # Checks whether a scheduled task
+            # is pending to run or not
+            schedule.run_pending()
+            time.sleep(1)
+        logger.info("Terminating schedule thread")
+
+    def terminate(self):
+        self._run = False
 
     @staticmethod
-    def get_instances(conf, daemon):
+    def get_instances(conf):
         """
         Instanciate Save instances
         :param conf: yaml file path
         :type conf: str
-        :param daemon: Ask to daemonize save
-        :type daemon: bool
         :return: dictionary of apps
         :rtype: dict
         """
@@ -140,7 +152,7 @@ saves:
                     )
                     schedules = save[Save.C_SAVE_SCHEDS]
 
-                saves[name] = Save(name, destination, retentions, schedules, app[name], daemon, conf)
+                saves[name] = Save(name, destination, retentions, schedules, app[name], conf)
 
             return saves
         except TypeError as e:
