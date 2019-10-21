@@ -71,7 +71,7 @@ class YAMLHelper:
         return dump(obj, Dumper=Dumper)
 
     @staticmethod
-    def analyse_keys(config_section, data_dict, mandatory_key_set=None, optional_key_set={}):
+    def analyse_keys(config_section, data_dict, mandatory_key_set={}, optional_key_set={}):
         """
         Watch for dict key set differences
         :param config_section:
@@ -85,31 +85,47 @@ class YAMLHelper:
         :raise: TypeError if key set is different than expected_key_set and if not all mandatory_key_set are in
         """
         key_set = set(data_dict.keys())
-        if mandatory_key_set:
-            diff = mandatory_key_set.difference(key_set)
+        err = ""
+
+        if len(mandatory_key_set) > 0:
+            got_key_set = key_set.difference(optional_key_set)
+            diff = mandatory_key_set.difference(got_key_set)
             if len(diff) != 0:
-                raise TypeError(
-                    "Missing mandatory {} key(s). Mandatory keys in {} are {}.".format(
+                err = "Missing mandatory {} key(s). Mandatory keys in {} are {}.".format(
                         diff,
                         config_section,
-                        mandatory_key_set,
+                        mandatory_key_set
                     )
-                )
+                # look deeper in case there is a typo
+                diff = got_key_set.difference(mandatory_key_set)
+                if len(diff) != 0:
+                    err += "Unrecognized {} key(s). Mandatory keys in {} are {}.".format(
+                            diff,
+                            config_section,
+                            mandatory_key_set
+                        )
+
             # removes mandatory keys
             key_set = key_set.difference(mandatory_key_set)
 
-        diff = key_set.difference(optional_key_set)
-        if len(diff) != 0:
-            if len(optional_key_set) == 0:
-                err = "Unrecognized {} key(s). {} should not contain other keys than {}".format(
-                    diff,
-                    config_section,
-                    mandatory_key_set,
-                )
-            else:
-                err = "Unrecognized {} key(s). Optional keys in {} should not contain other keys than {}.".format(
+        if len(optional_key_set) > 0:
+            diff = key_set.difference(optional_key_set)
+            if len(diff) != 0:
+                err += "Unrecognized {} key(s). Optional keys in {} should not contain other keys than {}.".format(
                     diff,
                     config_section,
                     optional_key_set,
+                )
+
+        if len(err) > 0:
+            raise TypeError(err)
+
+    @staticmethod
+    def check_key_values(key, value, value_set):
+        if value not in value_set:
+            err = "Unrecognized value {} in key {}. Should contains one of {}".format(
+                    value,
+                    key,
+                    value_set
                 )
             raise TypeError(err)

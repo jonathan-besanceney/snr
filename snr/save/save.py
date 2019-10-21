@@ -72,8 +72,37 @@ saves:
     C_SAVE_RETENTION = 'retention'
     C_SAVE_KEYS = {C_SAVE_APP_NAME}
     C_SAVE_OPT_KEYS = {C_SAVE_DEST, C_SAVE_SCHEDS, C_SAVE_RETENTION}
-    C_SAVE_SCHEDS_PERIOD = {'daily', 'weekly', 'monthly', 'quarterly', 'yearly'}
-    C_SAVE_SCHEDS_PERIOD_HOUR = 'hour'
+    C_SAVE_SCHEDS_EVERY = 'every'
+    C_SAVE_SCHEDS_INTERVAL = 'interval'
+    C_SAVE_SCHEDS_INTERVAL_VALUES = {
+        'second',
+        'seconds',
+        'minute',
+        'minutes',
+        'hour',
+        'hours',
+        'day',
+        'days',
+        'week',
+        'weeks',
+        'monday',
+        'mondays',
+        'tuesday',
+        'tuesdays',
+        'wednesday',
+        'wednesdays',
+        'thursday',
+        'thursdays',
+        'friday',
+        'fridays',
+        'saturday',
+        'saturdays',
+        'sunday',
+        'sundays'
+    }
+    C_SAVE_SCHEDS_AT = 'at'
+    C_SAVE_SCHEDS_KEYS = {C_SAVE_SCHEDS_EVERY, C_SAVE_SCHEDS_INTERVAL}
+    C_SAVE_SCHEDS_KEYS_OPT = {C_SAVE_SCHEDS_AT}
     C_SAVE_RETENTION_DBS = 'databases'
     C_SAVE_RETENTION_FILES = 'files'
     C_SAVE_RETENTION_OPT_KEYS = {C_SAVE_RETENTION_DBS, C_SAVE_RETENTION_FILES}
@@ -105,12 +134,33 @@ saves:
         self._run = True
 
     def run(self) -> None:
-        logger.info("Starting schedule thread")
-        while self._run:
-            # Checks whether a scheduled task
-            # is pending to run or not
-            schedule.run_pending()
-            time.sleep(1)
+        logger.info("Starting schedule thread...")
+        for sched in self._schedules:
+            job = schedule.every(sched[Save.C_SAVE_SCHEDS_EVERY])
+            job = job.__getattribute__(sched[Save.C_SAVE_SCHEDS_INTERVAL])
+            at = ""
+            if Save.C_SAVE_SCHEDS_AT in sched.keys():
+                job = job.at(sched[Save.C_SAVE_SCHEDS_AT])
+                at = sched[Save.C_SAVE_SCHEDS_AT]
+            job.do(self.save)
+            logger.info(
+                "setting up {} save every {} {} {}".format(
+                    self._name,
+                    sched[Save.C_SAVE_SCHEDS_EVERY],
+                    sched[Save.C_SAVE_SCHEDS_INTERVAL],
+                    at
+                )
+            )
+
+        try:
+            while self._run:
+                # Checks whether a scheduled task
+                # is pending to run or not
+                schedule.run_pending()
+                time.sleep(5)
+        except KeyboardInterrupt:
+            logger.warning("Caught KeyboardInterrupt")
+
         logger.info("Terminating schedule thread")
 
     def terminate(self):
@@ -145,11 +195,18 @@ saves:
                     retentions = save[Save.C_SAVE_RETENTION]
                 schedules = dict()
                 if Save.C_SAVE_SCHEDS in save.keys():
-                    YAMLHelper.analyse_keys(
-                        Save.C_SAVE_SCHEDS,
-                        save[Save.C_SAVE_SCHEDS],
-                        optional_key_set=Save.C_SAVE_SCHEDS_PERIOD
-                    )
+                    for sched in save[Save.C_SAVE_SCHEDS]:
+                        YAMLHelper.analyse_keys(
+                            Save.C_SAVE_SCHEDS,
+                            sched,
+                            Save.C_SAVE_SCHEDS_KEYS,
+                            Save.C_SAVE_SCHEDS_KEYS_OPT
+                        )
+                        YAMLHelper.check_key_values(
+                            Save.C_SAVE_SCHEDS_INTERVAL,
+                            sched[Save.C_SAVE_SCHEDS_INTERVAL],
+                            Save.C_SAVE_SCHEDS_INTERVAL_VALUES
+                        )
                     schedules = save[Save.C_SAVE_SCHEDS]
 
                 saves[name] = Save(name, destination, retentions, schedules, app[name], conf)
