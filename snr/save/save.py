@@ -48,23 +48,28 @@ class Save(Thread):
 
     C_YAML = """
 saves:
-  - name: seafile
-    destination: '/mnt/saves/$app/$type/$name/$name-$date'
+  - app_name: seafile
+    destination: '/data/saves/$app/$type/$name/$name-$date'
     retention:
-      database: database_standard
-      file: file_standard
+      databases: database_standard
+      files: file_standard
     schedules:
-      daily:
-        hour: "00:00"
-  - name: gitlab
-    destination: '/mnt/saves/$app/$type/$name/$name-$date'
+      - every: 1
+        interval: day
+        at: "00:00"
+  - app_name: gitlab
+    destination: '/data/saves/$app/$type/$name/$name-$date'
     retention:
-      database: database_standard
-      file: file_standard
+      databases: database_standard
+      files: file_standard
     schedules:
-      daily:
-        hour: "00:00"
+      - every: 1
+        interval: day
+        at: "01:00"
+  - app_name: seafile-test-restore
+  - app_name: gitlab-test-restore
 """
+
     C_SAVES = 'saves'
     C_SAVE_APP_NAME = 'app_name'
     C_SAVE_DEST = 'destination'
