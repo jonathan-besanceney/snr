@@ -30,7 +30,7 @@
 import os
 import logging.config
 
-from log import Logger
+from snr.log import Logger
 from snr.yamlhelper import YAMLHelper
 from snr.cli import CLI
 

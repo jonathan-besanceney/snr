@@ -1,40 +1,32 @@
-# Purpose:     Setup Script
+# -*- coding: utf8 -*-
+# ------------------------------------------------------------------------------
+# Name:        __init__.py
+# Purpose:     Small logging wrapper helping configuration and reuse
 #
 #
 # Author:      Jonathan Besanceney <jonathan.besanceney@gmail.com>
 #
 #
-# Created:     2019
-# Copyright:   (c) 2019
+# Created:     09/02/2019
+# Copyright:   (c) 2019 snr
 #
 # Licence:     LGPLv3 2019.
 #
-# This file is a part of save.
+# This file is a part of snr.
 #
-#    save is free software: you can redistribute it and/or modify
+#    snr is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Lesser General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    save is distributed in the hope that it will be useful,
+#    snr is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU Lesser General Public License for more details.
 #
 #    You should have received a copy of the GNU Lesser General Public License
-#    along with save.  If not, see <http://www.gnu.org/licenses/>.
+#    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+from snr.log.logger import Logger
 
-from distutils.core import setup
-
-setup(
-    name='save',
-    version='0.1',
-    packages=['save'],
-    url='',
-    license='LGPLv3',
-    author='Jonathan Besanceney',
-    author_email='jonathan.besanceney@gmail.com',
-    description='Closure Tree implementation',
-    install_requires=['PyYAML', 'PyInstaller', 'schedule'],
-)
+__all__ = ["Logger"]
