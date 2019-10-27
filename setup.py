@@ -30,7 +30,7 @@ from distutils.core import setup
 setup(
     name='save',
     version='0.1',
-    packages=['save'],
+    packages=['snr'],
     url='',
     license='LGPLv3',
     author='Jonathan Besanceney',
