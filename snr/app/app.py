@@ -45,25 +45,67 @@ logger = logging.getLogger(__name__)
 
 class App:
     """
-    apps:
+    App management
+    """
+
+    C_YAML = """
+apps:
+  - name: seafile
+    databases:
+      - name: ccnet
+        databaseName: ccnet-db
+        instance: my_instance
+        credentials: /root/.seafile
       - name: seafile
-        databases:
-          - name: ccnet
-            databasePrefix: restore_
-            databaseName: ccnet-db
-            instance: my_bubblebox
-          - name: seafile
-            databasePrefix: restore_
-            databaseName: seafile-db
-            instance: my_bubblebox
-          - name: seahub
-            databasePrefix: restore_
-            databaseName: seahub-db
-            instance: my_bubblebox
-        files:
-            - name: data
-              hostPath: /mnt/data0/volumes/seafile/data
-      [...]
+        databaseName: seafile-db
+        instance: my_instance
+        credentials: /root/.seafile
+      - name: seahub
+        databaseName: seahub-db
+        instance: my_instance
+        credentials: /root/.seafile
+    files:
+        - name: data
+          hostPath: /data/seafile
+  - name: seafile-test-restore
+    databases:
+      - name: ccnet
+        databasePrefix: restore_
+        databaseName: ccnet
+        instance: my_instance
+        credentials: /root/.seafile
+      - name: seafile
+        databasePrefix: restore_
+        databaseName: seafile
+        instance: my_instance
+        credentials: /root/.seafile
+      - name: seahub
+        databasePrefix: restore_
+        databaseName: seahub
+        instance: my_instance
+        credentials: /root/.seafile
+    files:
+      - name: data
+        hostPath: /data/seafile/restore/seafile
+  - name: gitlab
+    databases:
+      - name: gitlab
+        databaseName: gitlab
+        instance: pg_instance
+        credentials: /root/.gitlab
+    files:
+      - name: data
+        hostPath: /data/gitlab
+  - name: gitlab-test-restore
+    databases:
+      - name: gitlab
+        databasePrefix: restore_
+        databaseName: gitlab
+        instance: pg_instance
+        credentials: /root/.gitlab
+    files:
+      - name: data
+        hostPath: /data/restore/gitlab
     """
 
     C_APPS = 'apps'
@@ -74,6 +116,8 @@ class App:
     C_DATABASE_NAME = 'databaseName'
     C_DB_INSTANCE = 'instance'
     C_DB_KEYS = {C_DB_NAME, C_DATABASE_NAME, C_DB_INSTANCE}
+    C_DB_OPTIONAL_KEYS = {C_DATABASE_PREFIX, Database.D_CREDS}
+
     C_FILES = 'files'
     C_FILE_NAME = 'name'
     C_FILE_PATH = 'hostPath'
@@ -112,37 +156,47 @@ class App:
         self._save_atom = SaveAtom(db_names, file_names)
 
     @staticmethod
-    def get_app(conf):
+    def get_instances(conf):
         try:
             data = YAMLHelper.load(conf)
 
-            db_instances = Database.get_databases(conf)
+            db_instances = Database.get_instances(conf)
             if db_instances is None:
                 raise TypeError("Error getting databases.")
-            compression = Compression.get_compression(conf)
+            compression = Compression.get_instance(conf)
             if compression is None:
                 raise TypeError("Error getting compression object.")
 
             apps = dict()
             for app in data[App.C_APPS]:
-                YAMLHelper.analyse_keys(App.C_APPS, app, App.C_APP_KEYS)
+                # an app may not contain database or file
+                YAMLHelper.analyse_keys(App.C_APPS, app, optional_key_set=App.C_APP_KEYS)
 
                 databases = list()
                 for db in app[App.C_DBS]:
+                    YAMLHelper.analyse_keys(App.C_DBS, db, App.C_DB_KEYS, App.C_DB_OPTIONAL_KEYS)
+
                     db_prefix = ""
                     if App.C_DATABASE_PREFIX in db.keys():
                         db_prefix = db[App.C_DATABASE_PREFIX]
+                    credentials = ""
+                    if Database.D_CREDS in db.keys():
+                        credentials = YAMLHelper.load(db[Database.D_CREDS])
+                        YAMLHelper.analyse_keys(db[Database.D_CREDS], credentials, Database.C_KEYS)
+
                     databases.append(
                         {
                             App.C_DATABASE_PREFIX: db_prefix,
                             App.C_DB_NAME: db[App.C_DB_NAME],
                             App.C_DATABASE_NAME: db[App.C_DATABASE_NAME],
-                            App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]]
+                            App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]],
+                            Database.D_CREDS: credentials
                         }
                     )
 
                 files = dict()
                 for dirs in app[App.C_FILES]:
+                    YAMLHelper.analyse_keys(App.C_FILES, dirs, App.C_FILE_KEYS)
                     files[dirs[App.C_FILE_NAME]] = dirs[App.C_FILE_PATH]
 
                 apps[app[App.C_NAME]] = App(
@@ -216,10 +270,19 @@ class App:
                         db[App.C_DB_NAME],
                         self._compression.get_file_with_compressed_from_pipe_ext(save_path)
                     )
-                    save = functools.partial(db[App.C_DB_INSTANCE].save, db[App.C_DATABASE_NAME], save_path)
+                    save = functools.partial(
+                        db[App.C_DB_INSTANCE].save,
+                        db[App.C_DATABASE_NAME],
+                        save_path,
+                        self._get_database_attr(db, App.C_DATABASE_PREFIX)
+                    )
                     t = Thread(target=save, name=db[App.C_DB_NAME])
                     t.start()
                     db_threads.append(t)
+            if len(db_threads) + len(file_threads) == 0:
+                logger.warning("Nothing to do !")
+                return
+
             # wait for them
             for t in db_threads:
                 t.join()
@@ -249,7 +312,8 @@ class App:
                 file_date = App.get_file_date(full_path)
                 if file_date not in save_atoms.keys():
                     save_atoms[file_date] = self._save_atom.clone()
-                save_atoms[file_date].date = file_date
+                if not save_atoms[file_date].date:
+                    save_atoms[file_date].date = file_date
 
                 if save_type == App.C_DBS:
                     save_atoms[file_date].set_database(name, full_path)
@@ -258,7 +322,7 @@ class App:
 
         return save_atoms
 
-    def list_saves(self, source):
+    def get_saves(self, source):
         """
         List all saves for this app from source path. Returns a dictionary organized by date (in str).
         See C_DATE_FORMAT for dictionary keys generation.
@@ -307,16 +371,16 @@ class App:
         :return: True if list corresponds
         :rtype: bool
         """
-        app_db_list = list()
+        app_dbs = set()
         for d in self._databases:
-            app_db_list.append(d[App.C_DATABASE_NAME])
+            app_dbs.add(d[App.C_DATABASE_NAME])
 
-        diff = set(db_list).difference(set(app_db_list))
+        diff = set(db_list).difference(app_dbs)
         if len(diff) > 0:
             logger.error(
                 "Provided database set to restore {} does not corresponds to this app database set {}".format(
                     db_list,
-                    app_db_list
+                    app_dbs
                 )
             )
             return False
@@ -330,7 +394,7 @@ class App:
         :return: attr
         :rtype: Union[Database|str]
         """
-        db_attr = None
+        db_attr = ""
         for db in self._databases:
             if db_name == db[App.C_DATABASE_NAME]:
                 db_attr = db[attr]
@@ -352,7 +416,7 @@ class App:
             logger.error("restore({}) : Save atom is undefined !")
         if save_atom.status != AppSaveStatusEnum.FULL and save_atom.status != allow_status:
             logger.error(
-                "restore({}) : The selected save is {}, you must set allow_partial to allow a restore.".format(
+                "restore({}) : The selected save is {}, you must set allow_status=AppSaveStatusEnum.PARTIAL to allow a restore.".format(
                     save_atom, save_atom.status
                 )
             )
@@ -367,10 +431,12 @@ class App:
         threads = list()
         # file restore
         for f in save_atom.files:
-            decompress = functools.partial(self._compression.decompress, save_atom.get_file(f), self._files[f])
-            t = Thread(target=decompress, name=f)
-            t.start()
-            threads.append(t)
+            # avoid null file path
+            if save_atom.get_file(f):
+                decompress = functools.partial(self._compression.decompress, save_atom.get_file(f), self._files[f])
+                t = Thread(target=decompress, name=f)
+                t.start()
+                threads.append(t)
 
         # database restore
         for d in save_atom.databases:
@@ -379,14 +445,21 @@ class App:
                 db_instance.restore,
                 d,
                 save_atom.get_database(d),
-                self._get_database_attr(d, App.C_DATABASE_PREFIX)
-
+                self._get_database_attr(d, App.C_DATABASE_PREFIX),
+                self._get_database_attr(d, Database.D_CREDS)
             )
             t = Thread(target=restore, name=d)
             t.start()
             threads.append(t)
 
-        # wait for them
-        for t in threads:
-            t.join()
-        logger.info("finished {} restore in {}s".format(self._name, time.time() - start))
+        if len(threads) == 0:
+            logger.warning("Nothing to do !")
+        else:
+            try:
+                # wait for them
+                for t in threads:
+                    t.join()
+                logger.info("finished {} restore in {}s".format(self._name, time.time() - start))
+            except KeyboardInterrupt:
+                logger.warning("User interruption, trying to kill remaining processes")
+                raise

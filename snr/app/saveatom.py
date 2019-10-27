@@ -27,8 +27,10 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with docker.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+import os
 import pprint
 from enum import Enum
+from pathlib import Path
 
 
 class AppSaveStatusEnum(Enum):
@@ -38,22 +40,29 @@ class AppSaveStatusEnum(Enum):
 
 
 class SaveAtom:
+    FILE = "file"
+    DATABASE = "database"
+    PART_TYPES = {FILE, DATABASE}
+    MISSING_FLAG = "(missing!)"
+
     def __init__(self, databases=None, files=None):
         self._date = None
         self._databases = dict()
         if databases:
             self.databases = databases
+        self._databases_root_path = None
         self._files = dict()
         if files:
             self.files = files
+        self._files_root_path = None
         self._status = AppSaveStatusEnum.UNDEFINED
 
     def clone(self):
         cloned = SaveAtom()
-        cloned._date = self._date
-        cloned._databases = self._databases
-        cloned._files = self._files
-        cloned._status = self._status
+        cloned._date = str(self._date)
+        cloned._databases = dict(self._databases)
+        cloned._files = dict(self._files)
+        cloned._status = AppSaveStatusEnum(self._status)
         return cloned
 
     @property
@@ -70,6 +79,8 @@ class SaveAtom:
     def set_database(self, name, item):
         self._status = AppSaveStatusEnum.UNDEFINED
         self._databases[name] = item
+        if not self.databases_root_path:
+            self.databases_root_path = str(Path(os.path.split(item)[0]).parent)
 
     def del_database(self, name):
         self._status = AppSaveStatusEnum.UNDEFINED
@@ -85,17 +96,58 @@ class SaveAtom:
         self._status = AppSaveStatusEnum.UNDEFINED
         self._databases.update(dict((db, None) for db in dbs))
 
+    def print_databases(self):
+        databases = ""
+        for name in self._databases.keys():
+            missing = ""
+            if self._databases[name] is None:
+                missing = " " + SaveAtom.MISSING_FLAG
+            if databases == "":
+                databases = name + missing
+            else:
+                databases += ', ' + name + missing
+        return databases
+
+    @property
+    def databases_root_path(self):
+        return self._databases_root_path
+
+    @databases_root_path.setter
+    def databases_root_path(self, root_path):
+        if self._databases_root_path != root_path:
+            self._databases_root_path = root_path
+
     def get_file(self, name):
         return self._files[name]
 
     def set_file(self, name, item):
         self._status = AppSaveStatusEnum.UNDEFINED
         self._files[name] = item
+        if not self._files_root_path:
+            self.files_root_path = str(Path(os.path.split(item)[0]).parent)
 
     def del_file(self, name):
         self._status = AppSaveStatusEnum.UNDEFINED
         if name in self._files.keys():
             del self._files[name]
+
+    def part_exists(self, part, name):
+        if part in SaveAtom.PART_TYPES:
+            names = list()
+            names.extend(self.databases)
+            names.extend(self.files)
+            if name in names:
+                return True
+            return False
+        else:
+            raise TypeError("Unrecognized part {}. Should be one of {}".format(part, SaveAtom.PART_TYPES))
+
+    def del_part(self, part, name):
+        if self.part_exists(part, name):
+            if part == SaveAtom.DATABASE:
+                self.del_database(name)
+            else:
+                self.del_file(name)
 
     @property
     def files(self):
@@ -105,6 +157,27 @@ class SaveAtom:
     def files(self, files):
         self._status = AppSaveStatusEnum.UNDEFINED
         self._files.update(dict((f, None) for f in files))
+
+    def print_files(self):
+        files = ""
+        for name in self._files.keys():
+            missing = ""
+            if self._files[name] is None:
+                missing = " " + SaveAtom.MISSING_FLAG
+            if files == "":
+                files = name + missing
+            else:
+                files += ', ' + name + missing
+        return files
+
+    @property
+    def files_root_path(self):
+        return self._files_root_path
+
+    @files_root_path.setter
+    def files_root_path(self, root_path):
+        if self._files_root_path != root_path:
+            self._files_root_path = root_path
 
     @property
     def status(self):
@@ -131,7 +204,9 @@ class SaveAtom:
             {
                 'date': self._date,
                 'databases': self._databases,
+                'databases_root_path': self._databases_root_path,
                 'files': self._files,
+                'files_root_path': self._files_root_path,
                 'status': self.status.value
             }
         )

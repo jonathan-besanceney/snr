@@ -1,13 +1,13 @@
 # -*- coding: utf8 -*-
 # ------------------------------------------------------------------------------
-# Name:        __init__.py
-# Purpose:     
+# Name:        snr
+# Purpose:     Save and Restore entry point
 #
 #
 # Author:      Jonathan Besanceney <jonathan.besanceney@gmail.com>
 #
 #
-# Created:     06/10/2019
+# Created:     21/10/2019
 # Copyright:   (c) 2019 snr
 #
 # Licence:     LGPLv3 2016.
@@ -27,7 +27,38 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+import os
+import logging.config
 
-import snr
+from snr.log import Logger
+from snr.yamlhelper import YAMLHelper
+from snr.cli import CLI
 
-__all__ = ["snr"]
+C_YAML_LOG_BASIC = """
+version: 1
+disable_existing_loggers: False
+formatters:
+  simple:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: simple
+    stream: ext://sys.stdout
+
+root:
+  level: INFO
+  handlers: [console]
+        """
+data = YAMLHelper.loads(C_YAML_LOG_BASIC)
+logging.config.dictConfig(data)
+logger = logging.getLogger(__name__)
+
+
+if __name__ == '__main__':
+    args = CLI.init()
+    if os.path.exists(args.conf):
+        logger = Logger(YAMLHelper.load(args.conf), __name__).get()
+    args.func(args)  # call the default function

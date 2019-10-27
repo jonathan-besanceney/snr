@@ -48,8 +48,6 @@ class Period:
     Period definition.
     """
 
-    cache = dict()
-
     def __init__(self, start, duration, latest=False):
         """
         :param start: datetime for the day
@@ -63,11 +61,11 @@ class Period:
         self._duration = duration
         self._latest = latest
 
-        if self._duration == 1:
+        if duration == PeriodDurationEnum.DAY:
             self._latest = True
-        self._end = start - timedelta(days=duration.value)
-        logger.info(
-            "{} day(s) Period initialized from {} to {}. Select latest file {}".format(
+        self._end = start - timedelta(days=self._duration.value)
+        logger.debug(
+            "{} Period initialized from {} to {}. Select latest file {}".format(
                 duration, start, self._end, self._latest
             )
         )
@@ -75,24 +73,6 @@ class Period:
     @staticmethod
     def cache_reset():
         Period.cache.clear()
-
-    @staticmethod
-    def get_instance(start, duration, latest=False):
-        """
-        Factory. Caches instance of Period
-        :param start: datetime for the day
-        :type start: datetime
-        :param duration: number of days of this Period
-        :type duration: snr.retention.period.PeriodDurationEnum
-        :param latest: optional. Select earliest per default, except for one day duration
-        :type latest: bool
-        """
-        key = "{}-{}-{}".format(str(start), str(duration), str(latest))
-        if key not in Period.cache:
-            period = Period(start, duration, latest=False)
-            Period.cache[key] = period
-
-        return Period.cache[key]
 
     @property
     def start(self):
@@ -141,9 +121,7 @@ class Period:
                     selected_file = file
 
         if selected_file != "":
-            logger.info("{} day(s) Period, keeping {} ! ".format(self._duration, selected_file))
-        else:
-            logger.warning("{} day(s) Period, NO FILE TO KEEP !".format(self._duration))
+            logger.debug("{} Period, keeping {} ".format(self._duration, selected_file))
 
         return selected_file
 
@@ -153,13 +131,10 @@ class Periods:
     Defines Period.
     """
 
-    cache_date = date.today()
-    cache = dict()
-
     def __init__(self, period_length, number_of_period):
         """
         :param period_length: length in days
-        :type period_length: int
+        :type period_length: PeriodDurationEnum
         :param number_of_period: how many period instanciate from now
         :type number_of_period: int
         """
@@ -169,48 +144,27 @@ class Periods:
         self._period_list = list()
 
         period_start = datetime.today()
+
         i = 0
         while i < self._number_of_period:
-            p_instance = Period.get_instance(period_start, self._period_length)
+            p_instance = Period(period_start, self._period_length)
             self._period_list.append(p_instance)
             period_start = p_instance.end
             i += 1
-
-    @staticmethod
-    def get_instance(period_length, number_of_period):
-        """
-        :param period_length: length in days
-        :type period_length: int
-        :param number_of_period: how many period instanciate from now
-        :type number_of_period: int
-        """
-        key = '{}-{}'.format(str(period_length), str(number_of_period))
-
-        # makes cache lives for one day
-        today = date.today()
-        if Periods.cache_date != today:
-            Period.cache_reset()
-            if key in Periods.cache.keys():
-                del Periods.cache[key]
-
-        if key not in Periods.cache.keys():
-            Periods.cache[key] = Periods(period_length, number_of_period)
-
-        return Periods.cache[key]
 
     def get_matching_files_list(self, file_dict):
         """
         :param file_dict: file dictionary
         :type file_dict: dict
         :return: matching file list
-        :rtype: list
+        :rtype: set
         """
 
-        selected_file_list = list()
+        selected_file_list = set()
 
         for p in self._period_list:
             selected_file = p.get_matching_file(file_dict)
             if selected_file != "":
-                selected_file_list.append(selected_file)
+                selected_file_list.add(selected_file)
 
         return selected_file_list
