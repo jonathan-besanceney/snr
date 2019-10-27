@@ -7,7 +7,7 @@
 # Author:      Jonathan Besanceney <jonathan.besanceney@gmail.com>
 #
 #
-# Created:     06/10/2019
+# Created:     27/10/2019
 # Copyright:   (c) 2019 snr
 #
 # Licence:     LGPLv3 2016.
@@ -27,7 +27,6 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+from snr.cli.cli import CLI, CLIController
 
-import snr
-
-__all__ = ["snr"]
+__all__ = ["CLI", "CLIController"]

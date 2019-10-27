@@ -67,7 +67,15 @@ saves:
         interval: day
         at: "01:00"
   - app_name: seafile-test-restore
+    destination: '/data/saves/seafile/$type/$name/$name-$date'
+    allowed_actions:
+      - restore
+      #  save
   - app_name: gitlab-test-restore
+    destination: '/data/saves/gitlab/$type/$name/$name-$date'
+    allowed_actions:
+      - restore
+      #  save
 """
 
     C_SAVES = 'saves'
@@ -75,8 +83,9 @@ saves:
     C_SAVE_DEST = 'destination'
     C_SAVE_SCHEDS = 'schedules'
     C_SAVE_RETENTION = 'retention'
+    C_SAVE_ALLOWED_ACTIONS = 'allowed_actions'
     C_SAVE_KEYS = {C_SAVE_APP_NAME}
-    C_SAVE_OPT_KEYS = {C_SAVE_DEST, C_SAVE_SCHEDS, C_SAVE_RETENTION}
+    C_SAVE_OPT_KEYS = {C_SAVE_DEST, C_SAVE_SCHEDS, C_SAVE_RETENTION, C_SAVE_ALLOWED_ACTIONS}
     C_SAVE_SCHEDS_EVERY = 'every'
     C_SAVE_SCHEDS_INTERVAL = 'interval'
     C_SAVE_SCHEDS_INTERVAL_VALUES = {
@@ -111,8 +120,11 @@ saves:
     C_SAVE_RETENTION_DBS = 'databases'
     C_SAVE_RETENTION_FILES = 'files'
     C_SAVE_RETENTION_OPT_KEYS = {C_SAVE_RETENTION_DBS, C_SAVE_RETENTION_FILES}
+    C_SAVE_ACTION_SAVE = 'save'
+    C_SAVE_ACTION_RESTORE = 'restore'
+    C_SAVE_ACTIONS = {C_SAVE_ACTION_SAVE, C_SAVE_ACTION_RESTORE}
 
-    def __init__(self, name, destination, retentions, schedules, app, conf):
+    def __init__(self, name, destination, retentions, schedules, allowed_actions, app, conf):
         """
 
         :param name:
@@ -123,6 +135,8 @@ saves:
         :type retentions: dict
         :param schedules:
         :type schedules: dict
+        :param allowed_action:
+        :type allowed_action: list
         :param app: App
         :type app: App
         :param conf: conf file
@@ -134,42 +148,62 @@ saves:
         self._destination = destination
         self._retentions = retentions
         self._schedules = schedules
+        self._allowed_actions = allowed_actions
         self._app = app
         self._conf = conf
         self._run = True
 
     def run(self) -> None:
-        logger.info("Starting schedule thread...")
-        for sched in self._schedules:
-            job = schedule.every(sched[Save.C_SAVE_SCHEDS_EVERY])
-            job = job.__getattribute__(sched[Save.C_SAVE_SCHEDS_INTERVAL])
-            at = ""
-            if Save.C_SAVE_SCHEDS_AT in sched.keys():
-                job = job.at(sched[Save.C_SAVE_SCHEDS_AT])
-                at = sched[Save.C_SAVE_SCHEDS_AT]
-            job.do(self.save)
-            logger.info(
-                "setting up {} save every {} {} {}".format(
-                    self._name,
-                    sched[Save.C_SAVE_SCHEDS_EVERY],
-                    sched[Save.C_SAVE_SCHEDS_INTERVAL],
-                    at
+        if len(self._schedules) == 0:
+            logger.info("No schedule defined for {}".format(self._name))
+        else:
+            logger.info("Starting schedule threads for {}...".format(self._name))
+            for sched in self._schedules:
+                job = schedule.every(sched[Save.C_SAVE_SCHEDS_EVERY])
+                job = job.__getattribute__(sched[Save.C_SAVE_SCHEDS_INTERVAL])
+                at = ""
+                if Save.C_SAVE_SCHEDS_AT in sched.keys():
+                    job = job.at(sched[Save.C_SAVE_SCHEDS_AT])
+                    at = sched[Save.C_SAVE_SCHEDS_AT]
+                job.do(self.save)
+                logger.info(
+                    "setting up {} save every {} {} {}".format(
+                        self._name,
+                        sched[Save.C_SAVE_SCHEDS_EVERY],
+                        sched[Save.C_SAVE_SCHEDS_INTERVAL],
+                        at
+                    )
                 )
-            )
 
-        try:
-            while self._run:
-                # Checks whether a scheduled task
-                # is pending to run or not
-                schedule.run_pending()
-                time.sleep(5)
-        except KeyboardInterrupt:
-            logger.warning("Caught KeyboardInterrupt")
+            try:
+                while self._run:
+                    # Checks whether a scheduled task
+                    # is pending to run or not
+                    schedule.run_pending()
+                    time.sleep(5)
+            except KeyboardInterrupt:
+                logger.warning("Caught KeyboardInterrupt")
 
-        logger.info("Terminating schedule thread")
+            logger.info("Terminating schedule thread")
 
     def terminate(self):
         self._run = False
+
+    @staticmethod
+    def run_as_daemon(conf):
+        saves = Save.get_instances(conf)
+        try:
+            for name in saves.keys():
+                saves[name].start()
+            while True:
+                time.sleep(10)
+        except KeyboardInterrupt:
+            logger.warning("Caught KeyboardInterrupt")
+        finally:
+            for name in saves:
+                saves[name].terminate()
+            for name in saves:
+                saves[name].join()
 
     @staticmethod
     def get_instances(conf):
@@ -183,6 +217,9 @@ saves:
         try:
             data = YAMLHelper.load(conf)
             app = App.get_instances(conf)
+            if app is None:
+                raise TypeError("Error getting apps")
+
             saves = dict()
             for save in data[Save.C_SAVES]:
                 YAMLHelper.analyse_keys(Save.C_SAVES, save, Save.C_SAVE_KEYS, Save.C_SAVE_OPT_KEYS)
@@ -214,11 +251,22 @@ saves:
                         )
                     schedules = save[Save.C_SAVE_SCHEDS]
 
-                saves[name] = Save(name, destination, retentions, schedules, app[name], conf)
+                allowed_actions = Save.C_SAVE_ACTIONS
+                if Save.C_SAVE_ALLOWED_ACTIONS in save.keys():
+                    YAMLHelper.check_key_values(
+                        Save.C_SAVE_ALLOWED_ACTIONS,
+                        save[Save.C_SAVE_ALLOWED_ACTIONS],
+                        Save.C_SAVE_ACTIONS
+                    )
+                    allowed_actions = list()
+                    for action in save[Save.C_SAVE_ALLOWED_ACTIONS]:
+                        allowed_actions.append(action)
+                saves[name] = Save(name, destination, retentions, schedules, allowed_actions, app[name], conf)
 
             return saves
         except TypeError as e:
             logger.error("Save configuration error : {}".format(e))
+            raise e
         except IOError:
             logger.error("{} does not exist".format(conf))
 
@@ -229,6 +277,10 @@ saves:
         :return: filled save_atom
         :rtype: snr.app.SaveAtom
         """
+        if not self.restoreable:
+            logger.error('{} has no save right !'.format(self._name))
+            return
+
         start = time.time()
         # Get default save_atom if none set
         if save_atom is None:
@@ -261,6 +313,14 @@ saves:
         return self._app.get_saves(self._destination)
 
     @property
+    def save_atom(self):
+        """
+        :return: save_atom
+        :rtype: snr.app.SaveAtom
+        """
+        return self._app.save_atom
+
+    @property
     def last_save(self):
         """
         save atom
@@ -282,6 +342,10 @@ saves:
         :param allow_partial: Optional. Allow restoration of a partial save. FULL per default.
         :type allow_partial: snr.app.AppSaveStatusEnum
         """
+        if not self.restoreable:
+            logger.error('{} has no restore right !'.format(self._name))
+            return
+
         if save_atom is None and date is None:
             save_atom = self.last_save
             if save_atom is None:
@@ -298,3 +362,15 @@ saves:
                 save_atom = self.save_atoms[date]
 
         self._app.restore(save_atom, allow_partial)
+
+    @property
+    def saveable(self):
+        if Save.C_SAVE_ACTION_SAVE in self._allowed_actions:
+            return True
+        return False
+
+    @property
+    def restoreable(self):
+        if Save.C_SAVE_ACTION_RESTORE in self._allowed_actions:
+            return True
+        return False

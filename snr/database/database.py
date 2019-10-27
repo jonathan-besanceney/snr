@@ -42,43 +42,122 @@ class Database:
     """
     Database save and restore helper factory.
     Configured through yaml config file via database_helpers and databases keyword :
+    """
 
-    database_helpers:
-      postgres:
-        env:
-          PGPASSWORD: '$password'
-        dump_command: [
-          '/usr/bin/pg_dump',
-          '--host=$host',
-          '--port=$port',
-          '--username=$username',
-          '--dbname=$dbname'
-          ]
-        restore_command: [
-          '/usr/bin/psql',
-          '--host=$host',
-          '--port=$port',
-          '--username=$username',
-          '$dbname'
-        ]
-        create_database_command: [
-          '/usr/bin/psql',
-          '--host=$host',
-          '--port=$port',
-          '--username=$username',
-          'CREATE DATABASE ...;'
-        ]
-      [...]
+    C_YAML = """
+database_helpers:
+  postgres:
+    env:
+      PGPASSWORD: '$password'
+    dump_command: [
+      '/usr/bin/pg_dump',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--dbname=$dbname'
+      ]
+    restore_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '$dbname'
+    ]
+    list_database_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--tuples-only',
+      '--command=SELECT datname FROM pg_database WHERE datname NOT IN (''postgres'', ''template1'', ''template0'');'
+    ]
+    create_database_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--command=CREATE DATABASE $dbname WITH OWNER = postgres ENCODING = ''UTF8'' CONNECTION LIMIT = -1;'
+    ]
+    create_user_and_assign_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--command=DO
+      $do$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT
+          FROM   pg_catalog.pg_roles
+          WHERE  rolname = ''$user''
+        ) THEN
+          CREATE USER "$user" WITH LOGIN NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
+          ALTER USER "$user" PASSWORD ''$passwd'';
+        END IF;
+      END
+      $do$;
+      ALTER DATABASE $dbname OWNER TO "$user";'
+    ]
+  mysql:
+    env:
+      MYSQL_PWD: '$password'
+    dump_command: [
+      '/usr/bin/mysqldump',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--default-character-set=utf8',
+      '$dbname'
+      ]
+    restore_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '$dbname'
+    ]
+    list_database_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--execute=SELECT schema_name
+        FROM information_schema.schemata
+        WHERE schema_name NOT IN (''information_schema'', ''mysql'', ''performance_schema'', ''sys'');',
+      '--batch',
+      '--silent'
+    ]
+    create_database_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--execute=CREATE DATABASE $dbname CHARACTER SET utf8 COLLATE utf8_general_ci;'
+    ]
+    create_user_and_assign_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--execute=CREATE USER IF NOT EXISTS ''$user'' IDENTIFIED BY ''$passwd'';
+        GRANT ALL PRIVILEGES ON $dbname.* TO ''$user'';
+      '
+    ]
 
-    databases:
-      - instance: pg_bubblebox
-        type: postgres
-        host: 192.168.1.2
-        port: 5432
-        credentials: /home/jonathan/.pg_root
-        [...]
+databases:
+  - instance: pg_instance
+    type: postgres
+    host: 192.168.1.123
+    port: 5432
+    credentials: /root/.pg_root
+  - instance: my_instance
+    type: mysql
+    host: 192.168.1.124
+    port: 3306
+    credentials: /root/.my_root
 
     """
+
     HELPERS = 'database_helpers'
     HELPERS_KEYS = {'postgres', 'mysql'}
 
@@ -183,8 +262,8 @@ class Database:
             return databases
         except TypeError as e:
             logger.error("Database configuration error : {}".format(e))
-        except IOError:
-            logger.error("{} does not exist".format(conf))
+        except IOError as e:
+            logger.error("{}".format(e))
 
     def stop(self):
         if self._dump_process is None:
@@ -240,24 +319,27 @@ class Database:
 
         logger.info("starting {}".format(cmd))
 
-        self._dump_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self._compression.compress_from_pipe(self._dump_process.stdout, file)
-        if not self._dump_process.stdout.closed:
-            self._dump_process.stdout.close()
+        try:
+            self._dump_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self._compression.compress_from_pipe(self._dump_process.stdout, file)
+            if not self._dump_process.stdout.closed:
+                self._dump_process.stdout.close()
 
-        # remove env var
-        self._restore_env()
+            # remove env var
+            self._restore_env()
 
-        self._dump_process.wait()
-        if self._dump_process.returncode == 0:
-            logger.info("dumped {} in {:f}".format(dbname, time.time() - start))
-        else:
-            logger.error("Database dump ended with exit code {}".format(self._dump_process.returncode))
+            self._dump_process.wait()
+            if self._dump_process.returncode == 0:
+                logger.info("dumped {} in {:f}".format(dbname, time.time() - start))
+            else:
+                logger.error("Database dump ended with exit code {}".format(self._dump_process.returncode))
+                if not self._dump_process.stderr.closed:
+                    logger.error(self._dump_process.stderr.read().decode())
+
             if not self._dump_process.stderr.closed:
-                logger.error(self._dump_process.stderr.read().decode())
-
-        if not self._dump_process.stderr.closed:
-            self._dump_process.stderr.close()
+                self._dump_process.stderr.close()
+        except KeyboardInterrupt:
+            logger.warning("Caught KeyboardInterrupt !")
 
     def restore(self, dbname, backup, db_prefix='', credentials=None):
         if '{}{}'.format(db_prefix, dbname) not in self.databases:
@@ -278,23 +360,25 @@ class Database:
 
         self._prepare_env()
         cmd = self._prepare_command(self._restore_command, dbname, db_prefix)
+        try:
+            logger.info("starting {}".format(cmd))
+            extract_process = self._compression.decompress_to_pipe(backup)
+            with extract_process.stdout as f:
+                restore_process = subprocess.Popen(cmd, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            _, err = restore_process.communicate()
 
-        logger.info("starting {}".format(cmd))
-        extract_process = self._compression.decompress_to_pipe(backup)
-        with extract_process.stdout as f:
-            restore_process = subprocess.Popen(cmd, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _, err = restore_process.communicate()
+            self._restore_env()
 
-        self._restore_env()
+            if restore_process.returncode == 0:
+                if len(err) != 0:
+                    logger.warning(err.decode().replace('\n', ''))
 
-        if restore_process.returncode == 0:
-            if len(err) != 0:
-                logger.warning(err.decode().replace('\n', ''))
+                logger.info("restored {}{} in {:f}".format(db_prefix, dbname, time.time() - start))
 
-            logger.info("restored {}{} in {:f}".format(db_prefix, dbname, time.time() - start))
-
-        else:
-            logger.error(err.decode())
+            else:
+                logger.error(err.decode())
+        except KeyboardInterrupt:
+            logger.warning("Caught KeyboardInterrupt")
 
     def create_database(self, dbname, db_prefix=''):
         if '{}{}'.format(db_prefix, dbname) in self.databases:

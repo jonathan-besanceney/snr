@@ -36,6 +36,11 @@ except ImportError:
     from yaml import Loader, Dumper
 from yaml.parser import ParserError
 
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,13 +63,17 @@ class YAMLHelper:
                 with open(file, 'r') as f:
                     data = load(f, Loader=Loader)
                 YAMLHelper.cache[file] = data
-            except (ParserError, YAMLError) as e:
+            except (ParserError, YAMLError, FileNotFoundError, IOError) as e:
                 logger.error("Aborting : {}".format(e))
-                sys.exit(1)
-            except FileNotFoundError as e:
-                logger.error("Aborting : {}".format(e))
-                sys.exit(1)
+                raise e
         return YAMLHelper.cache[file]
+
+    @staticmethod
+    def loads(s):
+        fd = StringIO(s)
+        data = load(fd, Loader=Loader)
+        return data
+
 
     @staticmethod
     def dump(obj):
@@ -122,10 +131,14 @@ class YAMLHelper:
 
     @staticmethod
     def check_key_values(key, value, value_set):
-        if value not in value_set:
-            err = "Unrecognized value {} in key {}. Should contains one of {}".format(
-                    value,
-                    key,
-                    value_set
-                )
-            raise TypeError(err)
+        if isinstance(value, list) or isinstance(value, set):
+            for v in value:
+                YAMLHelper.check_key_values(key, v, value_set)
+        else:
+            if value not in value_set:
+                err = "Unrecognized value {} in key {}. Should contains one of {}".format(
+                        value,
+                        key,
+                        value_set
+                    )
+                raise TypeError(err)

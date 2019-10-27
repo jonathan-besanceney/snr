@@ -45,28 +45,67 @@ logger = logging.getLogger(__name__)
 
 class App:
     """
-    apps:
+    App management
+    """
+
+    C_YAML = """
+apps:
+  - name: seafile
+    databases:
+      - name: ccnet
+        databaseName: ccnet-db
+        instance: my_instance
+        credentials: /root/.seafile
       - name: seafile
-        databases:
-          - name: ccnet
-            databasePrefix: restore_
-            databaseName: ccnet-db
-            instance: my_bubblebox
-            credentials:
-          - name: seafile
-            databasePrefix: restore_
-            databaseName: seafile-db
-            instance: my_bubblebox
-            credentials:
-          - name: seahub
-            databasePrefix: restore_
-            databaseName: seahub-db
-            instance: my_bubblebox
-            credentials:
-        files:
-            - name: data
-              hostPath: /mnt/data0/volumes/seafile/data
-      [...]
+        databaseName: seafile-db
+        instance: my_instance
+        credentials: /root/.seafile
+      - name: seahub
+        databaseName: seahub-db
+        instance: my_instance
+        credentials: /root/.seafile
+    files:
+        - name: data
+          hostPath: /data/seafile
+  - name: seafile-test-restore
+    databases:
+      - name: ccnet
+        databasePrefix: restore_
+        databaseName: ccnet
+        instance: my_instance
+        credentials: /root/.seafile
+      - name: seafile
+        databasePrefix: restore_
+        databaseName: seafile
+        instance: my_instance
+        credentials: /root/.seafile
+      - name: seahub
+        databasePrefix: restore_
+        databaseName: seahub
+        instance: my_instance
+        credentials: /root/.seafile
+    files:
+      - name: data
+        hostPath: /data/seafile/restore/seafile
+  - name: gitlab
+    databases:
+      - name: gitlab
+        databaseName: gitlab
+        instance: pg_instance
+        credentials: /root/.gitlab
+    files:
+      - name: data
+        hostPath: /data/gitlab
+  - name: gitlab-test-restore
+    databases:
+      - name: gitlab
+        databasePrefix: restore_
+        databaseName: gitlab
+        instance: pg_instance
+        credentials: /root/.gitlab
+    files:
+      - name: data
+        hostPath: /data/restore/gitlab
     """
 
     C_APPS = 'apps'
@@ -240,6 +279,10 @@ class App:
                     t = Thread(target=save, name=db[App.C_DB_NAME])
                     t.start()
                     db_threads.append(t)
+            if len(db_threads) + len(file_threads) == 0:
+                logger.warning("Nothing to do !")
+                return
+
             # wait for them
             for t in db_threads:
                 t.join()
@@ -269,7 +312,8 @@ class App:
                 file_date = App.get_file_date(full_path)
                 if file_date not in save_atoms.keys():
                     save_atoms[file_date] = self._save_atom.clone()
-                save_atoms[file_date].date = file_date
+                if not save_atoms[file_date].date:
+                    save_atoms[file_date].date = file_date
 
                 if save_type == App.C_DBS:
                     save_atoms[file_date].set_database(name, full_path)
@@ -408,7 +452,14 @@ class App:
             t.start()
             threads.append(t)
 
-        # wait for them
-        for t in threads:
-            t.join()
-        logger.info("finished {} restore in {}s".format(self._name, time.time() - start))
+        if len(threads) == 0:
+            logger.warning("Nothing to do !")
+        else:
+            try:
+                # wait for them
+                for t in threads:
+                    t.join()
+                logger.info("finished {} restore in {}s".format(self._name, time.time() - start))
+            except KeyboardInterrupt:
+                logger.warning("User interruption, trying to kill remaining processes")
+                raise

@@ -307,11 +307,20 @@ compression_helpers:
         for arg in self._decompress_command:
             cmd.append(Template(arg).safe_substitute(file=file))
         logger.info("running {}".format(cmd))
-        p = subprocess.run(cmd, cwd=destination)
-        if p.returncode == 0:
-            logger.info("decompressed in {:f}s".format(time.time() - start))
-            return destination
+        try:
+            p = subprocess.run(cmd, cwd=destination)
+            if p.returncode == 0:
+                logger.info("decompressed in {:f}s".format(time.time() - start))
+                return destination
 
-        logger.error(p)
-        return None
-
+            logger.error(p)
+            return None
+        except KeyboardInterrupt:
+            logger.warning("Caught KeyboardInterrupt !")
+            return None
+        except ChildProcessError as e:
+            logger.warning("{}".format(e))
+            return None
+        except PermissionError as e:
+            logger.error("Cannot read {} : {}".format(destination, e))
+            return None

@@ -41,21 +41,24 @@ logger = logging.getLogger(__name__)
 class Retention:
     """
     Save retention management
-
-    retention:
-      - name: database_standard:
-        days: 5
-        week: 3
-        month: 1
-        quarter: 1
-        year: 1
-      - name: file_standard:
-        days: 1
-        week: -1
-        month: -1
-        quarter: -1
-        year: -1
     """
+
+    C_YAML = """
+retention:
+  - name: database_standard
+    days: 5
+    week: 3
+    month: 1
+    quarter: 1
+    year: 1
+  - name: file_standard
+    days: 1
+    week: -1
+    month: -1
+    quarter: -1
+    year: -1
+    """
+
     C_RETENTION = 'retention'
     C_RETENTION_NAME = 'name'
     C_RETENTION_DAYS = 'days'

@@ -64,7 +64,7 @@ class Period:
         if duration == PeriodDurationEnum.DAY:
             self._latest = True
         self._end = start - timedelta(days=self._duration.value)
-        logger.info(
+        logger.debug(
             "{} Period initialized from {} to {}. Select latest file {}".format(
                 duration, start, self._end, self._latest
             )
