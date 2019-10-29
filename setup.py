@@ -43,7 +43,7 @@ setup(
     author='Jonathan Besanceney',
     author_email='jonathan.besanceney@gmail.com',
     description='Save and Restore utility',
-    install_requires=['PyYAML', 'PyInstaller', 'schedule'],
+    install_requires=['PyYAML', 'schedule'],
     entry_points={
         'console_scripts': [
             'snr = snr.cli.cli:main',
