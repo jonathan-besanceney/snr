@@ -8,24 +8,24 @@
 #
 #
 # Created:     23/03/19
-# Copyright:   (c) 2019 logger
+# Copyright:   (c) 2019 snr
 #
 # Licence:     LGPLv3 2016.
 #
-# This file is a part of logger.
+# This file is a part of snr.
 #
-#    logger is free software: you can redistribute it and/or modify
+#    snr is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Lesser General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    logger is distributed in the hope that it will be useful,
+#    snr is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU Lesser General Public License for more details.
 #
 #    You should have received a copy of the GNU Lesser General Public License
-#    along with logger.  If not, see <http://www.gnu.org/licenses/>.
+#    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
 from os.path import join
 import logging.config

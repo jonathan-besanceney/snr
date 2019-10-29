@@ -28,11 +28,31 @@
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
 import argparse
+import os
+import logging.config
 
+from snr.log.logger import Logger
+from snr.yamlhelper.yamlhelper import YAMLHelper
 from snr.cli.clicontroller import CLIController
 
-if __name__ == '__main__':
-    pass
+C_YAML_LOG_BASIC = """
+version: 1
+disable_existing_loggers: False
+formatters:
+  simple:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: simple
+    stream: ext://sys.stdout
+
+root:
+  level: INFO
+  handlers: [console]
+"""
 
 
 class CLI:
@@ -117,7 +137,7 @@ class CLI:
     C_ACTIONS = [C_DAEMON, C_SAVE, C_RESTORE, C_GEN_CONFIG]
 
     @staticmethod
-    def init():
+    def get_parser():
         parser = argparse.ArgumentParser()
         parser.add_argument(
             '-c', '--conf',
@@ -133,5 +153,25 @@ class CLI:
             for opt in action['opts']:
                 sp.add_argument(*opt['args'], **opt['flags'])
             sp.set_defaults(func=action['func'])
+        return parser
 
-        return parser.parse_args()
+
+data = YAMLHelper.loads(C_YAML_LOG_BASIC)
+logging.config.dictConfig(data)
+logger = logging.getLogger(__name__)
+__all__ = ['main']
+
+
+def main():
+    parser = CLI.get_parser()
+    args = parser.parse_args()
+    if os.path.exists(args.conf):
+        logger = Logger(YAMLHelper.load(args.conf), __name__).get()
+    if hasattr(args, 'func'):
+        args.func(args)  # call the default function
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()
