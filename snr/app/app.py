@@ -27,6 +27,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+import re
 import time
 from datetime import datetime
 import logging
@@ -124,6 +125,7 @@ apps:
     C_FILE_KEYS = {C_FILE_NAME, C_FILE_PATH}
     C_APP_KEYS = {C_NAME, C_DBS, C_FILES}
     C_DATE_FORMAT = '%Y-%m-%d-%H-%M'
+    C_DATE_REGEX = re.compile(r'(\d\d\d\d-\d\d-\d\d-\d\d-\d\d)')
 
     STATUS = 'status'
 
@@ -227,8 +229,17 @@ apps:
         return self._save_atom.clone()
 
     @staticmethod
-    def get_file_date(path):
-        return datetime.fromtimestamp(os.path.getctime(path)).strftime(App.C_DATE_FORMAT)
+    def get_file_creation_date(path):
+        """
+        Return file creation date
+        *nixes does not store creation time. Thus, os.path.getctime() wont help
+        :param path: file path. It should contains App.C_DATE_REGEX (App.C_DATE_FORMAT) pattern before extension
+        :type path: str
+        :rtype: str
+        """
+        file = os.path.split(path)[1]
+        # select last match to deal with twisted file naming convention
+        return App.C_DATE_REGEX.match(file).groups()[-1]
 
     def save(self, destination, save_atom=None):
         """
@@ -290,7 +301,7 @@ apps:
                 if not os.path.exists(save_atom.get_database(t.name)):
                     save_atom.set_database(t.name, None)
                 elif save_atom.date is None:
-                    save_atom.date = App.get_file_date(save_atom.get_database(t.name))
+                    save_atom.date = App.get_file_creation_date(save_atom.get_database(t.name))
             for t in file_threads:
                 t.join()
                 # If save file does not exist, remove it from save_atom
@@ -309,7 +320,7 @@ apps:
         if os.path.exists(path):
             for f in os.listdir(path):
                 full_path = os.path.join(path, f)
-                file_date = App.get_file_date(full_path)
+                file_date = App.get_file_creation_date(full_path)
                 if file_date not in save_atoms.keys():
                     save_atoms[file_date] = self._save_atom.clone()
                 if not save_atoms[file_date].date:
