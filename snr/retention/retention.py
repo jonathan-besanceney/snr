@@ -32,6 +32,7 @@ import os
 import logging
 from datetime import datetime
 
+from snr.app import App
 from snr.yamlhelper import YAMLHelper
 from snr.retention.period import PeriodDurationEnum, Periods
 
