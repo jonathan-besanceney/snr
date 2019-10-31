@@ -167,7 +167,7 @@ retention:
                         if root not in all_files:
                             all_files[root] = dict()
 
-                        all_files[root][file] = App.get_file_creation_date(file)
+                        all_files[root][file] = datetime.strptime(App.get_file_creation_date(file), App.C_DATE_FORMAT)
         return all_files
 
     def _get_matching_files(self, all_files):
