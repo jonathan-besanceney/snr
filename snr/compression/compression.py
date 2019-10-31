@@ -50,7 +50,7 @@ compression_helpers:
   compressed_extention: tar.lzo
   compressed_from_pipe_ext: lzo
   compress_env:
-    #XZ_OPT: "-e9 --threads=0"
+    #XZ_OPT: "-0 --threads=5"
     LZOP: '--fast'
   compress_command: [
     '/bin/tar',

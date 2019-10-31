@@ -134,7 +134,12 @@ class CLI:
         'func': CLIController.genconf,
         'opts': []
     }
-    C_ACTIONS = [C_DAEMON, C_SAVE, C_RESTORE, C_GEN_CONFIG]
+    C_GEN_SYSTEMD = {
+        'arg': 'create-systemd-service',      'help': 'Create systemd service and exit',
+        'func': CLIController.create_systemd_service,
+        'opts': []
+    }
+    C_ACTIONS = [C_DAEMON, C_SAVE, C_RESTORE, C_GEN_CONFIG, C_GEN_SYSTEMD]
 
     @staticmethod
     def get_parser():
