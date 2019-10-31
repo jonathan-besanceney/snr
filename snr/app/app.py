@@ -239,7 +239,7 @@ apps:
         """
         file = os.path.split(path)[1]
         # select last match to deal with twisted file naming convention
-        return App.C_DATE_REGEX.match(file).groups()[-1]
+        return App.C_DATE_REGEX.search(file).groups()[-1]
 
     def save(self, destination, save_atom=None):
         """
