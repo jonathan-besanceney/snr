@@ -300,9 +300,9 @@ saves:
 
         logger.info("{} save done in {}s".format(self._name, time.time()-start))
         if save_atom.status != AppSaveStatusEnum.FULL:
-            logger.warning("{} save is {}".format(self._name, save_atom.status))
+            logger.warning("{} save is {}".format(self._name, save_atom.status.value))
         else:
-            logger.info("{} save is {}".format(self._name, save_atom.status))
+            logger.info("{} save is {}".format(self._name, save_atom.status.value))
         return save_atom
 
     @property

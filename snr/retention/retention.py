@@ -33,6 +33,7 @@ import logging
 from datetime import datetime
 
 from snr.app import App
+from snr.compression import Compression
 from snr.yamlhelper import YAMLHelper
 from snr.retention.period import PeriodDurationEnum, Periods
 
@@ -72,13 +73,14 @@ retention:
         C_RETENTION_DAYS, C_RETENTION_WEEKS, C_RETENTION_MONTHS, C_RETENTION_QUARTERS, C_RETENTION_YEARS
     }
 
-    def __init__(self, name, last_days=5, last_weeks=1, last_months=-1, last_quarters=1, last_years=1):
+    def __init__(self, name, last_days=5, last_weeks=1, last_months=-1, last_quarters=1, last_years=1, extensions=None):
         self._name = name
         self.last_days = Periods(PeriodDurationEnum.DAY, last_days)
         self.last_weeks = Periods(PeriodDurationEnum.WEEK, last_weeks)
         self.last_months = Periods(PeriodDurationEnum.MONTH, last_months)
         self.last_quarters = Periods(PeriodDurationEnum.QUARTER, last_quarters)
         self.last_years = Periods(PeriodDurationEnum.YEAR, last_years)
+        self._extensions = extensions
 
     @staticmethod
     def get_instance(conf, name):
@@ -95,6 +97,7 @@ retention:
             data = YAMLHelper.load(conf)
             instance = None
             names = set()
+            compression = Compression.get_instance(conf)
             for retention in data[Retention.C_RETENTION]:
                 YAMLHelper.analyse_keys(
                     Retention.C_RETENTION, retention, Retention.C_RETENTION_KEYS
@@ -109,6 +112,7 @@ retention:
                         retention[Retention.C_RETENTION_MONTHS],
                         retention[Retention.C_RETENTION_QUARTERS],
                         retention[Retention.C_RETENTION_YEARS],
+                        compression.extensions
                     )
             if instance is None:
                 logger.error("Retention {} does not exist. You must select one of {}".format(name, names))
@@ -151,7 +155,7 @@ retention:
 
 
     @staticmethod
-    def _make_file_dict(path):
+    def _make_file_dict(path, extensions):
         """
         Make save file dict along with creation time.
         :return: wanted files dict
@@ -163,7 +167,7 @@ retention:
                 file = os.path.join(root, file)
                 if os.path.isfile(file) and not os.path.islink(file):
                     ext = os.path.splitext(file)
-                    if ext[1] == ".xz" or ext[1] == ".tar.xz":
+                    if ext[1] in extensions:
                         if root not in all_files:
                             all_files[root] = dict()
 
@@ -205,7 +209,7 @@ retention:
 
     def run(self, path):
         logger.info("Starting retention on {}".format(path))
-        files = Retention._make_file_dict(path)
+        files = Retention._make_file_dict(path, self._extensions)
         wanted_files = self._get_matching_files(files)
         Retention._remove_unwanted_files(files, wanted_files)
 
