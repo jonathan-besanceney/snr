@@ -101,6 +101,23 @@ logging:
     handlers: [console, info_file_handler, error_file_handler]
         """
 
+    C_SYSTEMD_SERVICE_PATH = "/etc/systemd/system/snr.service"
+    C_SYSTEMD_SERVICE = """
+    [Unit]
+    Description=Save and Restore Daemon
+    Documentation=https://***REMOVED***/gitlab/kubernetes/snr
+    After=network-online.target
+
+    [Service]
+    ExecStart=/usr/bin/snr daemon
+    Restart=always
+    StartLimitInterval=0
+    RestartSec=10
+
+    [Install]
+    WantedBy=multi-user.target
+"""
+
     @staticmethod
     @check_conf
     def daemonize(args):
@@ -214,3 +231,24 @@ logging:
         except PermissionError as e:
             print("{}. Run as root if you intend to write in privileged folder".format(e))
 
+    @staticmethod
+    def create_systemd_service(args):
+        try:
+            if os.path.exists(CLIController.C_SYSTEMD_SERVICE_PATH):
+                print("{} already exists. Aborting systemd service creation".format(CLIController.C_SYSTEMD_SERVICE_PATH))
+                sys.exit(1)
+
+            with open(CLIController.C_SYSTEMD_SERVICE_PATH, 'w') as f:
+                f.write(CLIController.C_SYSTEMD_SERVICE)
+
+            print(
+                "Systemd service written in {} !".format(
+                    CLIController.C_SYSTEMD_SERVICE_PATH
+                )
+            )
+            print("Register service in boot with : systemctl daemon-reload && systemctl enable snr")
+            print("Start with : systemctl start snr")
+            print("Get current status with : systemctl status snr")
+            print("Get logs with : journalctl -u snr -ef")
+        except PermissionError as e:
+            print("{}. Run as root if you intend to write in privileged folder".format(e))
