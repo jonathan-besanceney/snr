@@ -45,20 +45,27 @@ class Compression:
 
     C_YAML = """
 compression_helpers:
-  compressed_extention: tar.xz
-  compressed_from_pipe_ext: xz
+  #compressed_extention: tar.xz
+  #compressed_from_pipe_ext: xz
+  compressed_extention: tar.lzo
+  compressed_from_pipe_ext: lzo
   compress_env:
-    XZ_OPT: "-e9 --threads=0"
+    #XZ_OPT: "-e9 --threads=0"
+    LZOP: '--fast'
   compress_command: [
     '/bin/tar',
     '--create',
-    '--xz',
+    #'--xz',
+    '--lzop',
+    '--exclude=*.socket',
+    '--exclude=socket',
     '--file',
     '$destination',
     '$file'
   ]
   compress_from_pipe: [
-    '/usr/bin/xz'
+    #'/usr/bin/xz'
+    '/usr/bin/lzop'
   ]
   decompress_command: [
     '/bin/tar',
@@ -68,7 +75,9 @@ compression_helpers:
     '/'
   ]
   decompress_to_pipe: [
-    '/usr/bin/xzcat',
+    #'/usr/bin/xzcat',
+    '/usr/bin/lzop',
+    '-dc',
     '$file'
   ]
     """
