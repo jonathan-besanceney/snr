@@ -59,7 +59,7 @@ class SaveAtom:
 
     def clone(self):
         cloned = SaveAtom()
-        cloned._date = str(self._date)
+        cloned._date = None
         cloned._databases = dict(self._databases)
         cloned._files = dict(self._files)
         cloned._status = AppSaveStatusEnum(self._status)
