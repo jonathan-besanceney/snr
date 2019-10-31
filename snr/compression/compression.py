@@ -48,9 +48,9 @@ compression_helpers:
   #compressed_extention: tar.xz
   #compressed_from_pipe_ext: xz
   compressed_extention: tar.lzo
-  compressed_from_pipe_ext: lzo
+  compressed_from_pipe_ext: xz
   compress_env:
-    #XZ_OPT: "-0 --threads=5"
+    XZ_OPT: "-0 --threads=5"
     LZOP: '--fast'
   compress_command: [
     '/bin/tar',
@@ -64,8 +64,8 @@ compression_helpers:
     '$file'
   ]
   compress_from_pipe: [
-    #'/usr/bin/xz'
-    '/usr/bin/lzop'
+    '/usr/bin/xz'
+    #'/usr/bin/lzop'
   ]
   decompress_command: [
     '/bin/tar',
@@ -75,9 +75,9 @@ compression_helpers:
     '/'
   ]
   decompress_to_pipe: [
-    #'/usr/bin/xzcat',
-    '/usr/bin/lzop',
-    '-dc',
+    '/usr/bin/xzcat',
+    #'/usr/bin/lzop',
+    #'-dc',
     '$file'
   ]
     """
