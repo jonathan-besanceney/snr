@@ -167,7 +167,7 @@ retention:
                 file = os.path.join(root, file)
                 if os.path.isfile(file) and not os.path.islink(file):
                     ext = os.path.splitext(file)
-                    if ext[1] in extensions:
+                    if ext[1][1:] in extensions:
                         if root not in all_files:
                             all_files[root] = dict()
 
