@@ -31,13 +31,34 @@ database_helpers:
       '--username=$username',
       '--command=CREATE DATABASE $dbname WITH OWNER = postgres ENCODING = ''UTF8'' CONNECTION LIMIT = -1;'
     ]
+    create_user_and_assign_command: [
+      '/usr/bin/psql',
+      '--host=$host',
+      '--port=$port',
+      '--username=$username',
+      '--command=DO
+      $do$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT
+          FROM   pg_catalog.pg_roles
+          WHERE  rolname = ''$user''
+        ) THEN
+          CREATE USER "$user" WITH LOGIN NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
+          ALTER USER "$user" PASSWORD ''$passwd'';
+        END IF;
+      END
+      $do$;
+      ALTER DATABASE $dbname OWNER TO "$user";'
+    ]
   mysql:
+    env:
+      MYSQL_PWD: '$password'
     dump_command: [
       '/usr/bin/mysqldump',
       '--host=$host',
       '--port=$port',
       '--user=$username',
-      '--password=$password',
       '--default-character-set=utf8',
       '$dbname'
       ]
@@ -46,7 +67,6 @@ database_helpers:
       '--host=$host',
       '--port=$port',
       '--user=$username',
-      '--password=$password',
       '$dbname'
     ]
     list_database_command: [
@@ -54,8 +74,9 @@ database_helpers:
       '--host=$host',
       '--port=$port',
       '--user=$username',
-      '--password=$password',
-      '--execute=SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN (''information_schema'', ''mysql'', ''performance_schema'', ''sys'');',
+      '--execute=SELECT schema_name
+        FROM information_schema.schemata
+        WHERE schema_name NOT IN (''information_schema'', ''mysql'', ''performance_schema'', ''sys'');',
       '--batch',
       '--silent'
     ]
@@ -64,24 +85,37 @@ database_helpers:
       '--host=$host',
       '--port=$port',
       '--user=$username',
-      '--password=$password',
       '--execute=CREATE DATABASE $dbname CHARACTER SET utf8 COLLATE utf8_general_ci;'
+    ]
+    create_user_and_assign_command: [
+      '/usr/bin/mysql',
+      '--host=$host',
+      '--port=$port',
+      '--user=$username',
+      '--execute=CREATE USER IF NOT EXISTS ''$user'' IDENTIFIED BY ''$passwd'';
+        GRANT ALL PRIVILEGES ON $dbname.* TO ''$user'';
+      '
     ]
 
 compression_helpers:
-  compressed_extention: tar.xz
+  compressed_extention: tar.lzo
+  #compressed_from_pipe_ext: lzo
   compressed_from_pipe_ext: xz
   compress_env:
-    XZ_OPT: "-e9 --threads=0"
+    XZ_OPT: '-0 --threads=5'
+    LZOP: '--fast'
   compress_command: [
     '/bin/tar',
     '--create',
-    '--xz',
+    '--lzop',
+    '--exclude=*.socket',
+    '--exclude=socket',
     '--file',
     '$destination',
     '$file'
   ]
   compress_from_pipe: [
+    #'/usr/bin/lzop'
     '/usr/bin/xz'
   ]
   decompress_command: [
@@ -92,34 +126,36 @@ compression_helpers:
     '/'
   ]
   decompress_to_pipe: [
+    #'/usr/bin/lzop',
+    #'-dc',
     '/usr/bin/xzcat',
     '$file'
   ]
 
 databases:
-  - instance: pg_bubblebox
+  - instance: pg_instance
     type: postgres
-    host: 192.168.1.2
+    host: 192.168.1.x
     port: 5432
-    credentials: /home/jonathan/.pg_root
-  - instance: my_bubblebox
+    credentials: /root/.snr/pg_root
+  - instance: my_instance
     type: mysql
-    host: 192.168.1.2
+    host: 192.168.1.x
     port: 3306
-    credentials: /home/jonathan/.my_root
+    credentials: /root/.snr/.my_root
 
 apps:
   - name: seafile
     databases:
       - name: ccnet
         databaseName: ccnet-db
-        instance: my_bubblebox
+        instance: my_instance
       - name: seafile
         databaseName: seafile-db
-        instance: my_bubblebox
+        instance: my_instance
       - name: seahub
         databaseName: seahub-db
-        instance: my_bubblebox
+        instance: my_instance
     files:
         - name: data
           hostPath: /mnt/data/volumes/seafile/data
@@ -127,52 +163,80 @@ apps:
     databases:
       - name: ccnet
         databaseName: restore-ccnet
-        instance: my_bubblebox
+        instance: my_instance
       - name: seafile
         databaseName: restore-seafile
-        instance: my_bubblebox
+        instance: my_instance
       - name: seahub
         databaseName: restore-seahub
-        instance: my_bubblebox
+        instance: my_instance
     files:
       - name: data
-        hostPath: /home/jonathan/restore/seafile/data
+        hostPath: /mnt/data/volumes/restore/seafile/data
   - name: gitlab
     databases:
       - name: gitlab
         databaseName: gitlab
-        instance: pg_bubblebox
+        instance: pg_instance
     files:
       - name: data
         hostPath: /mnt/data/volumes/gitlab/data
+  - name: gitlab-test-restore
+    databases:
+      - name: gitlab
+        databasePrefix: restore_
+        databaseName: gitlab
+        instance: pg_instance
+        credentials: /root/.snr/gitlab
+    files:
+      - name: data
+        hostPath: /mnt/data/volumes/restore/gitlab
 
 saves:
-  - name: seafile
+  - app_name: seafile
     destination: '/mnt/saves/$app/$type/$name/$name-$date'
+    retention:
+      databases: database_standard
+      files: file_standard
     schedules:
-      - daily:
-        hour: "00:00"
-  - name: gitlab
+      - every: 1
+        interval: day
+        at: "00:00"
+  - app_name: gitlab
     destination: '/mnt/saves/$app/$type/$name/$name-$date'
+    retention:
+      databases: database_standard
+      files: file_standard
     schedules:
-      - daily:
-        hour: "00:00"
+      - every: 1
+        interval: day
+        at: "00:00"
+  - app_name: seafile-test-restore
+    destination: '/mnt/saves/seafile/$type/$name/$name-$date'
+    allowed_actions:
+      - restore
+      #  save
+  - app_name: gitlab-test-restore
+    destination: '/mnt/saves/gitlab/$type/$name/$name-$date'
+    allowed_actions:
+      - restore
+      #  save
 
 retention:
-  databases:
-      days: 5
-      week: -1
-      month: 1
-      quarter: 1
-      year: 1
-  files:
-      days: 1
-      week: -1
-      month: -1
-      quarter: -1
-      year: -1
+  - name: database_standard
+    days: 5
+    week: 3
+    month: 1
+    quarter: 1
+    year: 1
+  - name: file_standard
+    days: 1
+    week: -1
+    month: -1
+    quarter: -1
+    year: -1
 
-log_path: /home/jonathan/.save/log
+log_path: /var/log/snr
 logging:
   version: 1
   disable_existing_loggers: False
