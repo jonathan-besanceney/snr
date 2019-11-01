@@ -159,7 +159,8 @@ saves:
         else:
             logger.info("Starting schedule threads for {}...".format(self._name))
             for sched in self._schedules:
-                job = schedule.every(sched[Save.C_SAVE_SCHEDS_EVERY])
+                s = schedule.Scheduler()
+                job = s.every(sched[Save.C_SAVE_SCHEDS_EVERY])
                 job = job.__getattribute__(sched[Save.C_SAVE_SCHEDS_INTERVAL])
                 at = ""
                 if Save.C_SAVE_SCHEDS_AT in sched.keys():
@@ -167,7 +168,7 @@ saves:
                     at = sched[Save.C_SAVE_SCHEDS_AT]
                 job.do(self.save)
                 logger.info(
-                    "setting up {} save every {} {} {}".format(
+                    "setting up {} save every {} {} at {}".format(
                         self._name,
                         sched[Save.C_SAVE_SCHEDS_EVERY],
                         sched[Save.C_SAVE_SCHEDS_INTERVAL],
@@ -179,8 +180,8 @@ saves:
                 while self._run:
                     # Checks whether a scheduled task
                     # is pending to run or not
-                    schedule.run_pending()
-                    time.sleep(5)
+                    s.run_pending()
+                    time.sleep(2)
             except KeyboardInterrupt:
                 logger.warning("Caught KeyboardInterrupt")
 
@@ -299,9 +300,9 @@ saves:
 
         logger.info("{} save done in {}s".format(self._name, time.time()-start))
         if save_atom.status != AppSaveStatusEnum.FULL:
-            logger.warning("{} save is {}".format(self._name, save_atom.status))
+            logger.warning("{} save is {}".format(self._name, save_atom.status.value))
         else:
-            logger.info("{} save is {}".format(self._name, save_atom.status))
+            logger.info("{} save is {}".format(self._name, save_atom.status.value))
         return save_atom
 
     @property

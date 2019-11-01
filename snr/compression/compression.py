@@ -111,6 +111,14 @@ compression_helpers:
         self._compress_from_pipe = compress_from_pipe
         self._decompress_to_pipe = decompress_to_pipe
 
+    @property
+    def extensions(self):
+        """
+        :return: Set of compressed file extensions
+        :rtype: set
+        """
+        return {self._compressed_extention, self._compressed_from_pipe_ext}
+
     def get_file_with_compressed_extension(self, file):
         return "{}.{}".format(file, self._compressed_extention)
 
