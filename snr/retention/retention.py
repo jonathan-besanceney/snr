@@ -166,7 +166,13 @@ retention:
             for file in files:
                 file = os.path.join(root, file)
                 if os.path.isfile(file) and not os.path.islink(file):
-                    ext = os.path.splitext(file)[1][1:]
+                    name, ext = os.path.splitext(file)
+                    # get tar extension if any
+                    _, tar = os.path.splitext(name)
+                    # rebuild full extension
+                    ext = tar + ext
+                    # remove leading dot
+                    ext = ext[1:]
                     if ext in extensions:
                         if root not in all_files:
                             all_files[root] = dict()
