@@ -169,7 +169,9 @@ compression_helpers:
         :type is_dir: bool
         :raise: PermissionError
         """
-        if not is_dir:
+        if is_dir:
+            save_dir = destination
+        else:
             save_dir = os.path.split(destination)[0]
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
