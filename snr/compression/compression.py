@@ -160,14 +160,17 @@ compression_helpers:
         return False
 
     @staticmethod
-    def _create_folder(destination):
+    def _create_folder(destination, is_dir=False):
         """
-        Act like mkdir -p. Remove file part from destination string.
+        Act like mkdir -p. Remove file part from destination string unless is_dir set to true.
         :param destination: folder(s) to create
         :type destination: str
+        :param is_dir: Optional, default to False
+        :type is_dir: bool
         :raise: PermissionError
         """
-        save_dir = os.path.split(destination)[0]
+        if not is_dir:
+            save_dir = os.path.split(destination)[0]
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -312,10 +315,11 @@ compression_helpers:
         if not os.path.exists(file):
             logger.error("Source {} does not exists. Aborting decompress().".format(file))
             return None
+
         if not os.path.exists(destination):
             logger.warning("Creating dir {}".format(destination))
             try:
-                Compression._create_folder(destination)
+                Compression._create_folder(destination, is_dir=True)
             except PermissionError as e:
                 logger.error("Cannot create directory {} : {}".format(destination, e))
                 return None
@@ -340,4 +344,7 @@ compression_helpers:
             return None
         except PermissionError as e:
             logger.error("Cannot read {} : {}".format(destination, e))
+            return None
+        except FileNotFoundError as e:
+            logger.error("Cannot decompress in {} : {}".format(destination, e))
             return None
