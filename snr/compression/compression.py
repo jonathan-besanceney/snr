@@ -55,9 +55,9 @@ class Compression:
     C_YAML = """
 compression_helpers:
   #compressed_extention: tar.xz
-  #compressed_from_pipe_ext: xz
-  compressed_extention: tar.lzo
   compressed_from_pipe_ext: xz
+  compressed_extention: tar.lzo
+  #compressed_from_pipe_ext: lzo
   compress_env:
     XZ_OPT: "-0 --threads=5"
     LZOP: '--fast'
@@ -72,10 +72,33 @@ compression_helpers:
     '$destination',
     '$file'
   ]
+  compress_info_command: [
+    '/usr/bin/lzop',
+    '-l',
+    '$file'
+  ]
+  compress_info_command_output: {
+    'data_line': -1,
+    'compressed_size_index': 1,
+    'uncompressed_size_index': 2,
+    'ratio_index': 3
+  }
   compress_from_pipe: [
     '/usr/bin/xz'
     #'/usr/bin/lzop'
   ]
+  compress_from_pipe_info: [
+    '/usr/bin/xz',
+    '--robot',
+    '--list',
+    '$file'
+  ]
+  compress_from_pipe_info_output : {
+    'data_line': -1,
+    'compressed_size_index': 3,
+    'uncompressed_size_index': 4,
+    'ratio_index': 5
+  }
   decompress_command: [
     '/bin/tar',
     'xaf',
@@ -87,7 +110,7 @@ compression_helpers:
     #'-dc',
     '$file'
   ]
-    """
+"""
 
     cache = dict()
     C_HELPERS = 'compression_helpers'

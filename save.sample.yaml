@@ -100,15 +100,17 @@ database_helpers:
     ]
 
 compression_helpers:
+  #compressed_extention: tar.xz
+  compressed_from_pipe_ext: xz
   compressed_extention: tar.lzo
   #compressed_from_pipe_ext: lzo
-  compressed_from_pipe_ext: xz
   compress_env:
-    XZ_OPT: '-0 --threads=5'
+    XZ_OPT: "-0 --threads=5"
     LZOP: '--fast'
   compress_command: [
     '/bin/tar',
     '--create',
+    #'--xz',
     '--lzop',
     '--exclude=*.socket',
     '--exclude=socket',
@@ -116,32 +118,21 @@ compression_helpers:
     '$destination',
     '$file'
   ]
-  compress_from_pipe: [
-    #'/usr/bin/lzop'
-    '/usr/bin/xz'
-  ]
-  decompress_command: [
-    '/bin/tar',
-    'xaf',
-    '$file'
-  ]
-  decompress_to_pipe: [
-    #'/usr/bin/lzop',
-    #'-dc',
-    '/usr/bin/xzcat',
-    '$file'
-  ]
   compress_info_command: [
     '/usr/bin/lzop',
     '-l',
     '$file'
   ]
-  compress_info_command_output: {
+  compress_info_command_output : {
     'data_line': -1,
     'compressed_size_index': 1,
     'uncompressed_size_index': 2,
     'ratio_index': 3
   }
+  compress_from_pipe: [
+    '/usr/bin/xz'
+    #'/usr/bin/lzop'
+  ]
   compress_from_pipe_info: [
     '/usr/bin/xz',
     '--robot',
@@ -154,7 +145,17 @@ compression_helpers:
     'uncompressed_size_index': 4,
     'ratio_index': 5
   }
-
+  decompress_command: [
+    '/bin/tar',
+    'xaf',
+    '$file'
+  ]
+  decompress_to_pipe: [
+    '/usr/bin/xzcat',
+    #'/usr/bin/lzop',
+    #'-dc',
+    '$file'
+  ]
 
 databases:
   - instance: pg_instance
