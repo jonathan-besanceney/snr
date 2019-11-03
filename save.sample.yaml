@@ -131,6 +131,30 @@ compression_helpers:
     '/usr/bin/xzcat',
     '$file'
   ]
+  compress_info_command: [
+    '/usr/bin/lzop',
+    '-l',
+    '$file'
+  ]
+  compress_info_command_output: {
+    'data_line': -1,
+    'compressed_size_index': 1,
+    'uncompressed_size_index': 2,
+    'ratio_index': 3
+  }
+  compress_from_pipe_info: [
+    '/usr/bin/xz',
+    '--robot',
+    '--list',
+    '$file'
+  ]
+  compress_from_pipe_info_output: {
+    'data_line': -1,
+    'compressed_size_index': 3,
+    'uncompressed_size_index': 4,
+    'ratio_index': 5
+  }
+
 
 databases:
   - instance: pg_instance
