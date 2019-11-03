@@ -70,9 +70,7 @@ compression_helpers:
   decompress_command: [
     '/bin/tar',
     'xaf',
-    '$file',
-    '-C',
-    '/'
+    '$file'
   ]
   decompress_to_pipe: [
     '/usr/bin/xzcat',
