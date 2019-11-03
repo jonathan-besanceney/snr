@@ -325,15 +325,16 @@ apps:
             for f in os.listdir(path):
                 full_path = os.path.join(path, f)
                 file_date = App.get_file_creation_date(full_path)
-                if file_date not in save_atoms.keys():
-                    save_atoms[file_date] = self._save_atom.clone()
-                if not save_atoms[file_date].date:
-                    save_atoms[file_date].date = file_date
+                if file_date:
+                    if file_date not in save_atoms.keys():
+                        save_atoms[file_date] = self._save_atom.clone()
+                    if not save_atoms[file_date].date:
+                        save_atoms[file_date].date = file_date
 
-                if save_type == App.C_DBS:
-                    save_atoms[file_date].set_database(name, full_path)
-                elif save_type == App.C_FILES:
-                    save_atoms[file_date].set_file(name, full_path)
+                    if save_type == App.C_DBS:
+                        save_atoms[file_date].set_database(name, full_path)
+                    elif save_type == App.C_FILES:
+                        save_atoms[file_date].set_file(name, full_path)
 
         return save_atoms
 

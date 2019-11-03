@@ -1,16 +1,16 @@
 # -*- coding: utf8 -*-
 # ------------------------------------------------------------------------------
-# Name:        setup
-# Purpose:     Setup Script
+# Name:        __init__.py
+# Purpose:     
 #
 #
 # Author:      Jonathan Besanceney <jonathan.besanceney@gmail.com>
 #
 #
-# Created:     2019
-# Copyright:   (c) 2019
+# Created:     03/11/2019
+# Copyright:   (c) 2019 snr
 #
-# Licence:     LGPLv3 2019.
+# Licence:     LGPLv3 2016.
 #
 # This file is a part of snr.
 #
@@ -27,26 +27,6 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
-from setuptools import setup
+from snr.units.units import Units
 
-with open("README.md", 'r') as f:
-    long_description = f.read()
-
-setup(
-    name='snr',
-    version='1.0',
-    packages=['snr', 'snr.app', 'snr.cli', 'snr.log', 'snr.save', 'snr.database', 'snr.retention', 'snr.yamlhelper',
-              'snr.compression', 'snr.units'],
-    url='https://***REMOVED***/gitlab/kubernetes/snr',
-    long_description=long_description,
-    license='LGPLv3',
-    author='Jonathan Besanceney',
-    author_email='jonathan.besanceney@gmail.com',
-    description='Save and Restore utility',
-    install_requires=['PyYAML', 'schedule'],
-    entry_points={
-        'console_scripts': [
-            'snr = snr.cli.cli:main',
-        ],
-    }
-)
+__all__ = ["Units"]
