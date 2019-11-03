@@ -36,7 +36,7 @@ setup(
     name='snr',
     version='1.0',
     packages=['snr', 'snr.app', 'snr.cli', 'snr.log', 'snr.save', 'snr.database', 'snr.retention', 'snr.yamlhelper',
-              'snr.compression'],
+              'snr.compression', 'snr.units'],
     url='https://***REMOVED***/gitlab/kubernetes/snr',
     long_description=long_description,
     license='LGPLv3',
