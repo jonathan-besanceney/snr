@@ -27,7 +27,6 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+from snr.units.units import Units
 
-
-if __name__ == '__main__':
-    pass
+__all__ = ["Units"]
