@@ -93,7 +93,7 @@ compression_helpers:
     '--list',
     '$file'
   ]
-  compress_from_pipe_info_output : {
+  compress_from_pipe_info_output: {
     'data_line': -1,
     'compressed_size_index': 3,
     'uncompressed_size_index': 4,

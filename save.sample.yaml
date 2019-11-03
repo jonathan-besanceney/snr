@@ -123,7 +123,7 @@ compression_helpers:
     '-l',
     '$file'
   ]
-  compress_info_command_output : {
+  compress_info_command_output: {
     'data_line': -1,
     'compressed_size_index': 1,
     'uncompressed_size_index': 2,
