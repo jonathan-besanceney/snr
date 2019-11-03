@@ -54,6 +54,8 @@ database_helpers:
       '--host=$host',
       '--port=$port',
       '--username=$username',
+      '--clean',
+      '--if-exists',
       '--dbname=$dbname'
       ]
     restore_command: [
