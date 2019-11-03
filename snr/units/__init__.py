@@ -7,7 +7,7 @@
 # Author:      Jonathan Besanceney <jonathan.besanceney@gmail.com>
 #
 #
-# Created:     08/09/2019
+# Created:     03/11/2019
 # Copyright:   (c) 2019 snr
 #
 # Licence:     LGPLv3 2016.
@@ -27,6 +27,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
-from snr.compression.compression import Compression, CMode
 
-__all__ = ["Compression", "CMode"]
+
+if __name__ == '__main__':
+    pass

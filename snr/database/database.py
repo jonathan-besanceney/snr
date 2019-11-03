@@ -34,7 +34,8 @@ import subprocess
 import os
 
 from snr.yamlhelper.yamlhelper import YAMLHelper
-from snr.compression.compression import Compression
+from snr.compression.compression import Compression, CMode
+
 logger = logging.getLogger(__name__)
 
 
@@ -332,7 +333,13 @@ databases:
 
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
-                logger.info("dumped {} in {:f}".format(dbname, time.time() - start))
+                logger.info(
+                    self._compression.get_statistics(
+                        self._compression.get_file_with_compressed_from_pipe_ext(file),
+                        time.time() - start,
+                        CMode.DUMP
+                    )
+                )
             else:
                 logger.error("Database dump ended with exit code {}".format(self._dump_process.returncode))
                 if not self._dump_process.stderr.closed:
@@ -375,7 +382,7 @@ databases:
                 if len(err) != 0:
                     logger.warning(err.decode().replace('\n', ''))
 
-                logger.info("restored {}{} in {:f}".format(db_prefix, dbname, time.time() - start))
+                logger.info(self._compression.get_statistics(backup, time.time() - start, CMode.RESTORE))
 
             else:
                 logger.error(err.decode())
