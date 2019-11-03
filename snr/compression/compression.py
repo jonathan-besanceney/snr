@@ -34,8 +34,8 @@ import os
 from enum import Enum
 from string import Template
 
-from snr.units.units import Units
-from snr.yamlhelper.yamlhelper import YAMLHelper
+from snr.units import Units
+from snr.yamlhelper import YAMLHelper
 
 logger = logging.getLogger(__name__)
 
