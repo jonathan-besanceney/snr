@@ -393,6 +393,8 @@ compression_helpers:
 
     def get_statistics(self, file, seconds, mode):
         """
+        Gives statistics about file compression/decompression.
+        TODO : Too slow. Should be replaced by 'du --max-depth=0' and some calculation to improve efficiency
         :param file: compressed file path
         :type file: str
         :param seconds: time in second to perform COMPRESSION or DECOMPRESSION
@@ -402,34 +404,34 @@ compression_helpers:
         :return: statistics
         :rtype: str
         """
-        if file.endswith(self._compressed_extention):
-            cmd = list()
-            for arg in self._compress_info_command:
-                cmd.append(Template(arg).safe_substitute(file=file))
-            output = self._compress_info_command_output
-        elif file.endswith(self._compressed_from_pipe_ext):
-            cmd = list()
-            for arg in self._compress_from_pipe_info:
-                cmd.append(Template(arg).safe_substitute(file=file))
-            output = self._compress_from_pipe_info_output
-        else:
-            return
+        # if file.endswith(self._compressed_extention):
+        #     cmd = list()
+        #     for arg in self._compress_info_command:
+        #         cmd.append(Template(arg).safe_substitute(file=file))
+        #     output = self._compress_info_command_output
+        # elif file.endswith(self._compressed_from_pipe_ext):
+        #     cmd = list()
+        #     for arg in self._compress_from_pipe_info:
+        #         cmd.append(Template(arg).safe_substitute(file=file))
+        #     output = self._compress_from_pipe_info_output
+        # else:
+        #     return
+        #
+        # logger.info("running {}".format(cmd))
+        # p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        # lines = list()
+        # with p.stdout as out:
+        #     for line in out:
+        #         lines.append(line.decode())
+        # data_line = lines[output['data_line']].split()
 
-        logger.info("running {}".format(cmd))
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        lines = list()
-        with p.stdout as out:
-            for line in out:
-                lines.append(line.decode())
-        data_line = lines[output['data_line']].split()
-
-        original_size_bytes = int(data_line[output['uncompressed_size_index']])
-        original_size = Units.convert_bytes(original_size_bytes)
-        compressed_size_bytes = int(data_line[output['compressed_size_index']])
-        compressed_size = Units.convert_bytes(compressed_size_bytes)
-        ratio = data_line[output['ratio_index']]
+        # original_size_bytes = int(data_line[output['uncompressed_size_index']])
+        original_size = -1  # Units.convert_bytes(original_size_bytes)
+        # compressed_size_bytes = int(data_line[output['compressed_size_index']])
+        compressed_size = -1  # Units.convert_bytes(compressed_size_bytes)
+        ratio = 0  # data_line[output['ratio_index']]
         time_spent = Units.convert_seconds(seconds)
-        bitrate = Units.get_bitrate(original_size_bytes, seconds)
+        bitrate = 0  # Units.get_bitrate(original_size_bytes, seconds)
 
         if mode == CMode.COMPRESS:
             stats = 'Compressed {file} of {compressed_size} in {time_spent}. ' \
