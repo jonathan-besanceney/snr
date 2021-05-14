@@ -324,7 +324,7 @@ databases:
 
         try:
             self._dump_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            uncompressed_size = self._compression.compress_from_pipe(self._dump_process.stdout, file)
+            compressed_filename = self._compression.compress_from_pipe(self._dump_process.stdout, file)
             if not self._dump_process.stdout.closed:
                 self._dump_process.stdout.close()
 
@@ -334,14 +334,7 @@ databases:
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
                 seconds = time.time() - start
-                logger.info(
-                    Compression.get_statistics(
-                        uncompressed_size,
-                        self._compression.get_file_with_compressed_from_pipe_ext(file),
-                        seconds,
-                        CMode.DUMP
-                    )
-                )
+                logger.info(self._compression.get_statistics(compressed_filename, seconds, CMode.DUMP))
             else:
                 logger.error("Database dump ended with exit code {}".format(self._dump_process.returncode))
                 if not self._dump_process.stderr.closed:
@@ -376,7 +369,7 @@ databases:
             extract_process = self._compression.decompress_to_pipe(backup)
             with extract_process.stdout as f:
                 restore_process = subprocess.Popen(cmd, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out, err = restore_process.communicate()
+            _, err = restore_process.communicate()
 
             self._restore_env()
 
@@ -384,8 +377,7 @@ databases:
                 if len(err) != 0:
                     logger.warning(err.decode().replace('\n', ''))
                 seconds = time.time() - start
-                uncompressed_size = len(out)
-                logger.info(Compression.get_statistics(uncompressed_size, backup, seconds, CMode.RESTORE))
+                logger.info(self._compression.get_statistics(backup, seconds, CMode.RESTORE))
 
             else:
                 logger.error(err.decode())
