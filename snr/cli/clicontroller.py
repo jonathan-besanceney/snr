@@ -105,7 +105,7 @@ logging:
     C_SYSTEMD_SERVICE = """
     [Unit]
     Description=Save and Restore Daemon
-    Documentation=https://***REMOVED***/gitlab/kubernetes/snr
+    Documentation=https://github.com/jonathan-besanceney/snr
     After=network-online.target
 
     [Service]
