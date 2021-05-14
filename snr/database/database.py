@@ -324,7 +324,7 @@ databases:
 
         try:
             self._dump_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            self._compression.compress_from_pipe(self._dump_process.stdout, file)
+            uncompressed_size = self._compression.compress_from_pipe(self._dump_process.stdout, file)
             if not self._dump_process.stdout.closed:
                 self._dump_process.stdout.close()
 
@@ -333,10 +333,12 @@ databases:
 
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
+                seconds = time.time() - start
                 logger.info(
-                    self._compression.get_statistics(
+                    Compression.get_statistics(
+                        uncompressed_size,
                         self._compression.get_file_with_compressed_from_pipe_ext(file),
-                        time.time() - start,
+                        seconds,
                         CMode.DUMP
                     )
                 )
@@ -374,15 +376,16 @@ databases:
             extract_process = self._compression.decompress_to_pipe(backup)
             with extract_process.stdout as f:
                 restore_process = subprocess.Popen(cmd, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            _, err = restore_process.communicate()
+            out, err = restore_process.communicate()
 
             self._restore_env()
 
             if restore_process.returncode == 0:
                 if len(err) != 0:
                     logger.warning(err.decode().replace('\n', ''))
-
-                logger.info(self._compression.get_statistics(backup, time.time() - start, CMode.RESTORE))
+                seconds = time.time() - start
+                uncompressed_size = len(out)
+                logger.info(Compression.get_statistics(uncompressed_size, backup, seconds, CMode.RESTORE))
 
             else:
                 logger.error(err.decode())

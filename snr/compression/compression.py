@@ -33,6 +33,7 @@ import subprocess
 import os
 from enum import Enum
 from string import Template
+from pathlib import Path
 
 from snr.units import Units
 from snr.yamlhelper import YAMLHelper
@@ -224,8 +225,8 @@ compression_helpers:
         :type pipe: subprocess.PIPE
         :param destination: destination file without extention
         :type destination: str
-        :return: destination path with compression extention, None on error
-        :rtype: Union[str|None]
+        :return: size of the uncompressed data, None on error
+        :rtype: Union[int|None]
         """
         if pipe is None:
             logger.error("Pipe is None, aborting compress_from_pipe()")
@@ -242,10 +243,10 @@ compression_helpers:
             p = subprocess.Popen(self._compress_from_pipe, stdin=pipe, stdout=f)
 
         # start process and wait until it finishes
-        p.communicate()
+        out, _ = p.communicate()
 
         if p.returncode == 0:
-            return destination
+            return len(out)
 
         logger.error(p)
         return None
@@ -295,7 +296,9 @@ compression_helpers:
 
             p.wait()
             if p.returncode == 0:
-                logger.info(self.get_statistics(destination, time.time() - start, CMode.COMPRESS))
+                seconds = time.time() - start
+                original_size = self.get_folder_size(source)
+                logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
                 return destination
             logger.error(p)
             return None
@@ -373,9 +376,10 @@ compression_helpers:
         try:
             p = subprocess.run(cmd, cwd=destination)
             if p.returncode == 0:
-                logger.info(self.get_statistics(file, time.time() - start, CMode.DECOMPRESS))
+                seconds = time.time() - start
+                original_size = self.get_folder_size(destination)
+                logger.info(Compression.get_statistics(original_size, file, seconds, CMode.DECOMPRESS))
                 return destination
-
             logger.error(p)
             return None
         except KeyboardInterrupt:
@@ -391,12 +395,26 @@ compression_helpers:
             logger.error("Cannot decompress in {} : {}".format(destination, e))
             return None
 
-    def get_statistics(self, file, seconds, mode):
+    @staticmethod
+    def get_folder_size(folder):
+        """
+        Returns folder size
+        :param folder: folder path
+        :type folder: str
+        :return: size in bytes
+        :rtype: int
+        """
+        root_directory = Path('.')
+        return sum(f.stat().st_size for f in root_directory.glob('**/*') if f.is_file())
+
+    @staticmethod
+    def get_statistics(original_size_bytes, compressed_file, seconds, mode):
         """
         Gives statistics about file compression/decompression.
-        TODO : Too slow. Should be replaced by 'du --max-depth=0' and some calculation to improve efficiency
-        :param file: compressed file path
-        :type file: str
+        :param original_size_bytes: uncompressed size in bytes
+        :type original_size_bytes: int
+        :param compressed_file: compressed file path
+        :type compressed_file: str
         :param seconds: time in second to perform COMPRESSION or DECOMPRESSION
         :type seconds: float
         :param mode: Display stats for COMPRESSION or DECOMPRESSION
@@ -404,34 +422,13 @@ compression_helpers:
         :return: statistics
         :rtype: str
         """
-        # if file.endswith(self._compressed_extention):
-        #     cmd = list()
-        #     for arg in self._compress_info_command:
-        #         cmd.append(Template(arg).safe_substitute(file=file))
-        #     output = self._compress_info_command_output
-        # elif file.endswith(self._compressed_from_pipe_ext):
-        #     cmd = list()
-        #     for arg in self._compress_from_pipe_info:
-        #         cmd.append(Template(arg).safe_substitute(file=file))
-        #     output = self._compress_from_pipe_info_output
-        # else:
-        #     return
-        #
-        # logger.info("running {}".format(cmd))
-        # p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        # lines = list()
-        # with p.stdout as out:
-        #     for line in out:
-        #         lines.append(line.decode())
-        # data_line = lines[output['data_line']].split()
 
-        # original_size_bytes = int(data_line[output['uncompressed_size_index']])
-        original_size = -1  # Units.convert_bytes(original_size_bytes)
-        # compressed_size_bytes = int(data_line[output['compressed_size_index']])
-        compressed_size = -1  # Units.convert_bytes(compressed_size_bytes)
-        ratio = 0  # data_line[output['ratio_index']]
+        original_size = Units.convert_bytes(original_size_bytes)
+        compressed_size_bytes = os.stat(compressed_file).st_size
+        compressed_size = Units.convert_bytes(compressed_size_bytes)
+        ratio = compressed_size_bytes / original_size_bytes
         time_spent = Units.convert_seconds(seconds)
-        bitrate = 0  # Units.get_bitrate(original_size_bytes, seconds)
+        bitrate = Units.get_bitrate(original_size_bytes, seconds)
 
         if mode == CMode.COMPRESS:
             stats = 'Compressed {file} of {compressed_size} in {time_spent}. ' \
@@ -447,7 +444,7 @@ compression_helpers:
                     'Restoration bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
 
         return stats.format(
-            file=file,
+            file=compressed_file,
             compressed_size=compressed_size,
             time_spent=time_spent,
             bitrate=bitrate,
