@@ -448,26 +448,8 @@ compression_helpers:
         time_spent = Units.convert_seconds(seconds)
         bitrate = Units.get_bitrate(original_size_bytes, seconds)
 
-        if mode == CMode.COMPRESS:
-            stats = 'Compressed {file} of {compressed_size} in {time_spent}. ' \
-                    'Compression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
-        elif mode == CMode.DUMP:
-            stats = 'Dumped {file} of {compressed_size} in {time_spent}. ' \
-                    'Dump bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
-        elif mode == CMode.DECOMPRESS:
-            stats = 'Decompressed {file} of {compressed_size} in {time_spent}. ' \
-                    'Decompression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
-        elif mode == CMode.RESTORE:
-            stats = 'Restored {file} of {compressed_size} in {time_spent}. ' \
-                    'Restoration bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
-
-        return stats.format(
-            file=file,
-            compressed_size=compressed_size,
-            time_spent=time_spent,
-            bitrate=bitrate,
-            original_size=original_size,
-            ratio=ratio
+        return Compression._print_stats(
+            file, compressed_size, time_spent, bitrate, original_size, ratio, mode
         )
 
     @staticmethod
@@ -485,14 +467,18 @@ compression_helpers:
         :return: statistics
         :rtype: str
         """
-        logger.debug("get_statistics({}, {}, {}, {})".format(original_size_bytes, compressed_file, seconds, mode))
         original_size = Units.convert_bytes(original_size_bytes)
         compressed_size_bytes = os.stat(compressed_file).st_size
         compressed_size = Units.convert_bytes(compressed_size_bytes)
-        ratio = compressed_size_bytes / original_size_bytes
+        ratio = round(compressed_size_bytes / original_size_bytes, ndigits=2)
         time_spent = Units.convert_seconds(seconds)
         bitrate = Units.get_bitrate(original_size_bytes, seconds)
+        return Compression._print_stats(
+            compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode
+        )
 
+    @staticmethod
+    def _print_stats(compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode):
         if mode == CMode.COMPRESS:
             stats = 'Compressed {file} of {compressed_size} in {time_spent}. ' \
                     'Compression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
