@@ -334,7 +334,7 @@ databases:
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
                 seconds = time.time() - start
-                logger.info(self._compression.get_statistics(compressed_filename, seconds, CMode.DUMP))
+                logger.info(self._compression.get_pipe_statistics(compressed_filename, seconds, CMode.DUMP))
             else:
                 logger.error("Database dump ended with exit code {}".format(self._dump_process.returncode))
                 if not self._dump_process.stderr.closed:
@@ -377,7 +377,7 @@ databases:
                 if len(err) != 0:
                     logger.warning(err.decode().replace('\n', ''))
                 seconds = time.time() - start
-                logger.info(self._compression.get_statistics(backup, seconds, CMode.RESTORE))
+                logger.info(self._compression.get_pipe_statistics(backup, seconds, CMode.RESTORE))
 
             else:
                 logger.error(err.decode())
