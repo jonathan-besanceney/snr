@@ -373,6 +373,7 @@ compression_helpers:
         cmd = list()
         for arg in self._decompress_command:
             cmd.append(Template(arg).safe_substitute(file=file))
+        logger.info("Decompress {} to {}".format(file, destination))
         logger.info("running {}".format(cmd))
         try:
             p = subprocess.run(cmd, cwd=destination)
