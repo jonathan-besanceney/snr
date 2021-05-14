@@ -57,6 +57,7 @@ class Units:
     @staticmethod
     def convert_bytes(b):
         """
+        Convert bytes to human readable unit
         :param b: bytes
         :type b: int
         :return: converted

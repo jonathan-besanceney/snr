@@ -324,7 +324,7 @@ databases:
 
         try:
             self._dump_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            self._compression.compress_from_pipe(self._dump_process.stdout, file)
+            compressed_filename = self._compression.compress_from_pipe(self._dump_process.stdout, file)
             if not self._dump_process.stdout.closed:
                 self._dump_process.stdout.close()
 
@@ -333,13 +333,8 @@ databases:
 
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
-                logger.info(
-                    self._compression.get_statistics(
-                        self._compression.get_file_with_compressed_from_pipe_ext(file),
-                        time.time() - start,
-                        CMode.DUMP
-                    )
-                )
+                seconds = time.time() - start
+                logger.info(self._compression.get_pipe_statistics(compressed_filename, seconds, CMode.DUMP))
             else:
                 logger.error("Database dump ended with exit code {}".format(self._dump_process.returncode))
                 if not self._dump_process.stderr.closed:
@@ -381,8 +376,8 @@ databases:
             if restore_process.returncode == 0:
                 if len(err) != 0:
                     logger.warning(err.decode().replace('\n', ''))
-
-                logger.info(self._compression.get_statistics(backup, time.time() - start, CMode.RESTORE))
+                seconds = time.time() - start
+                logger.info(self._compression.get_pipe_statistics(backup, seconds, CMode.RESTORE))
 
             else:
                 logger.error(err.decode())
