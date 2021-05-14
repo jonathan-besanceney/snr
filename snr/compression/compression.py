@@ -405,7 +405,7 @@ compression_helpers:
         :return: size in bytes
         :rtype: int
         """
-        root_directory = Path('.')
+        root_directory = Path(folder)
         return sum(f.stat().st_size for f in root_directory.glob('**/*') if f.is_file())
 
     def get_statistics(self, file, seconds, mode):
