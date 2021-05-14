@@ -25,7 +25,7 @@ It comes with a CLI providing these functionalities. You can run `snr -h` to get
 ## Installation
 
 ```
-git clone https://***REMOVED***/gitlab/kubernetes/snr.git
+git clone git@github.com:jonathan-besanceney/snr.git
 cd snr
 python setup.py install
 ```
