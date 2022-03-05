@@ -176,7 +176,7 @@ apps:
 
                 databases = list()
                 # Do we have DB(s) to save
-                if app[App.C_DBS]:
+                if App.C_DBS in app and app[App.C_DBS]:
                     for db in app[App.C_DBS]:
                         YAMLHelper.analyse_keys(App.C_DBS, db, App.C_DB_KEYS, App.C_DB_OPTIONAL_KEYS)
 
@@ -200,7 +200,7 @@ apps:
 
                 files = dict()
                 # Do we have Files to save
-                if app[App.C_FILES]:
+                if App.C_FILES in app and app[App.C_FILES]:
                     for dirs in app[App.C_FILES]:
                         YAMLHelper.analyse_keys(App.C_FILES, dirs, App.C_FILE_KEYS)
                         files[dirs[App.C_FILE_NAME]] = dirs[App.C_FILE_PATH]
