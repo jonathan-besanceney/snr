@@ -37,7 +37,7 @@ setup(
     version='1.07',
     packages=['snr', 'snr.app', 'snr.cli', 'snr.log', 'snr.save', 'snr.database', 'snr.retention', 'snr.yamlhelper',
               'snr.compression', 'snr.units'],
-    url='https://***REMOVED***/gitlab/kubernetes/snr',
+    url='https://github.com/jonathan-besanceney/snr',
     long_description=long_description,
     license='LGPLv3',
     author='Jonathan Besanceney',

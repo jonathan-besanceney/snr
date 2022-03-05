@@ -1,6 +1,6 @@
 # Save and Restore - SnR
 
-![Image of Supernova Remanent - SNR](https://***REMOVED***/gitlab/kubernetes/snr/raw/develop/images/300px-Keplers_supernova.jpg)
+![Image of Supernova Remanent - SNR](https://github.com/jonathan-besanceney/snr/raw/main/images/300px-Keplers_supernova.jpg)
 
 Small tool to make applications (databases and files) save and restore easy. 
 
@@ -25,7 +25,7 @@ It comes with a CLI providing these functionalities. You can run `snr -h` to get
 ## Installation
 
 ```
-git clone https://***REMOVED***/gitlab/kubernetes/snr.git
+git clone git@github.com:jonathan-besanceney/snr.git
 cd snr
 python setup.py install
 ```
