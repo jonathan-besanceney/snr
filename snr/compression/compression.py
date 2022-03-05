@@ -299,7 +299,13 @@ compression_helpers:
             if p.returncode == 0:
                 seconds = time.time() - start
                 original_size = self.get_folder_size(source)
-                logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
+                if original_size == 0:
+                    logger.warning(
+                        "{} folder content is 0 byte. Please check your configuration: "
+                        "One apps->name->files might refer to empty folder and should be set to NULL.".format(source)
+                    )
+                else:
+                    logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
                 return destination
             logger.error(p)
             return None
