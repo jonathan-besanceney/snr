@@ -1,6 +1,6 @@
 # Save and Restore - SnR
 
-![Image of Supernova Remanent - SNR](https://***REMOVED***/gitlab/kubernetes/snr/raw/develop/images/300px-Keplers_supernova.jpg)
+![Image of Supernova Remanent - SNR](https://github.com/jonathan-besanceney/snr/raw/main/images/300px-Keplers_supernova.jpg)
 
 Small tool to make applications (databases and files) save and restore easy. 
 
