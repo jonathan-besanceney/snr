@@ -299,7 +299,13 @@ compression_helpers:
             if p.returncode == 0:
                 seconds = time.time() - start
                 original_size = self.get_folder_size(source)
-                logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
+                if original_size == 0:
+                    logger.warning(
+                        "{} folder content is 0 byte. Please check your configuration: "
+                        "One apps->name->files might refer to empty folder and should be set to NULL.".format(source)
+                    )
+                else:
+                    logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
                 return destination
             logger.error(p)
             return None
@@ -442,6 +448,10 @@ compression_helpers:
         data_line = lines[output['data_line']].split()
 
         original_size_bytes = int(data_line[output['uncompressed_size_index']])
+        if original_size_bytes == 0:
+            logger.warning("Can't read following output to compute stats: {}".format(data_line))
+            return "Will not compute stats for {} due to previous error.".format(file)
+
         original_size = Units.convert_bytes(original_size_bytes)
         compressed_size_bytes = int(data_line[output['compressed_size_index']])
         compressed_size = Units.convert_bytes(compressed_size_bytes)
@@ -468,15 +478,19 @@ compression_helpers:
         :return: statistics
         :rtype: str
         """
-        original_size = Units.convert_bytes(original_size_bytes)
-        compressed_size_bytes = os.stat(compressed_file).st_size
-        compressed_size = Units.convert_bytes(compressed_size_bytes)
-        ratio = round(compressed_size_bytes / original_size_bytes, ndigits=2)
-        time_spent = Units.convert_seconds(seconds)
-        bitrate = Units.get_bitrate(original_size_bytes, seconds)
-        return Compression._print_stats(
-            compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode
-        )
+        if original_size_bytes == 0:
+            logger.error("Can't computing stats for {}: original size is 0".format(compressed_file))
+            return "Please verify integrity of {}".format(compressed_file)
+        else:
+            original_size = Units.convert_bytes(original_size_bytes)
+            compressed_size_bytes = os.stat(compressed_file).st_size
+            compressed_size = Units.convert_bytes(compressed_size_bytes)
+            ratio = round(compressed_size_bytes / original_size_bytes, ndigits=2)
+            time_spent = Units.convert_seconds(seconds)
+            bitrate = Units.get_bitrate(original_size_bytes, seconds)
+            return Compression._print_stats(
+                compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode
+            )
 
     @staticmethod
     def _print_stats(compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode):

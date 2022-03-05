@@ -175,31 +175,35 @@ apps:
                 YAMLHelper.analyse_keys(App.C_APPS, app, optional_key_set=App.C_APP_KEYS)
 
                 databases = list()
-                for db in app[App.C_DBS]:
-                    YAMLHelper.analyse_keys(App.C_DBS, db, App.C_DB_KEYS, App.C_DB_OPTIONAL_KEYS)
+                # Do we have DB(s) to save
+                if App.C_DBS in app and app[App.C_DBS]:
+                    for db in app[App.C_DBS]:
+                        YAMLHelper.analyse_keys(App.C_DBS, db, App.C_DB_KEYS, App.C_DB_OPTIONAL_KEYS)
 
-                    db_prefix = ""
-                    if App.C_DATABASE_PREFIX in db.keys():
-                        db_prefix = db[App.C_DATABASE_PREFIX]
-                    credentials = ""
-                    if Database.D_CREDS in db.keys():
-                        credentials = YAMLHelper.load(db[Database.D_CREDS])
-                        YAMLHelper.analyse_keys(db[Database.D_CREDS], credentials, Database.C_KEYS)
+                        db_prefix = ""
+                        if App.C_DATABASE_PREFIX in db.keys():
+                            db_prefix = db[App.C_DATABASE_PREFIX]
+                        credentials = ""
+                        if Database.D_CREDS in db.keys():
+                            credentials = YAMLHelper.load(db[Database.D_CREDS])
+                            YAMLHelper.analyse_keys(db[Database.D_CREDS], credentials, Database.C_KEYS)
 
-                    databases.append(
-                        {
-                            App.C_DATABASE_PREFIX: db_prefix,
-                            App.C_DB_NAME: db[App.C_DB_NAME],
-                            App.C_DATABASE_NAME: db[App.C_DATABASE_NAME],
-                            App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]],
-                            Database.D_CREDS: credentials
-                        }
-                    )
+                        databases.append(
+                            {
+                                App.C_DATABASE_PREFIX: db_prefix,
+                                App.C_DB_NAME: db[App.C_DB_NAME],
+                                App.C_DATABASE_NAME: db[App.C_DATABASE_NAME],
+                                App.C_DB_INSTANCE: db_instances[db[App.C_DB_INSTANCE]],
+                                Database.D_CREDS: credentials
+                            }
+                        )
 
                 files = dict()
-                for dirs in app[App.C_FILES]:
-                    YAMLHelper.analyse_keys(App.C_FILES, dirs, App.C_FILE_KEYS)
-                    files[dirs[App.C_FILE_NAME]] = dirs[App.C_FILE_PATH]
+                # Do we have Files to save
+                if App.C_FILES in app and app[App.C_FILES]:
+                    for dirs in app[App.C_FILES]:
+                        YAMLHelper.analyse_keys(App.C_FILES, dirs, App.C_FILE_KEYS)
+                        files[dirs[App.C_FILE_NAME]] = dirs[App.C_FILE_PATH]
 
                 apps[app[App.C_NAME]] = App(
                     app[App.C_NAME],
@@ -210,7 +214,7 @@ apps:
 
             return apps
         except TypeError as e:
-            logger.error("Cannot initialize apps : {}".format(e))
+            logger.error("Cannot initialize {} app : {}".format(app['name'], e))
         except IOError as e:
             logger.error("{} does not exist".format(conf))
 
