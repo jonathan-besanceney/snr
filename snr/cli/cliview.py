@@ -68,31 +68,35 @@ class CLIView:
     @staticmethod
     def print_saveable_apps(saves):
         app_list = [x for x in saves.keys() if saves[x].saveable]
-        atom_list = CLIView.atom_list(saves, app_list)
-
-        # get column width
-        width = dict()
-        width['name_width'] = max(max([len(x) for x in app_list]), len(CLIView.C_HEADER_APPS))
-        width['file_width'] = max(max([len(', '.join(x.files)) for x in atom_list]), len(CLIView.C_HEADER_FILES))
-        width['db_width'] = max(max([len(', '.join(x.databases)) for x in atom_list]), len(CLIView.C_HEADER_DB))
-        width['comment_width'] = CLIView.comment_width(saves, app_list)
-        # header
         print("Apps available for save: {}\n".format(', '.join(app_list)))
-        print(CLIView.C_SAVE_HEADER.format(*CLIView.C_SAVE_COLUMNS, **width))
-        # lines
-        for name in app_list:
-            save_atom = saves[name].save_atom
-            comment = '--exclude ' + ' '.join(['file:{}'.format(x) for x in save_atom.files]) + ' ' + ' '.join(
-                ['database:{}'.format(x) for x in save_atom.databases])
-            print(
-                CLIView.C_SAVE_LINE.format(
-                    name,
-                    ', '.join(save_atom.files),
-                    ', '.join(save_atom.databases),
-                    comment,
-                    **width
+
+        atom_list = CLIView.atom_list(saves, app_list)
+        if len(atom_list) == 0:
+            print("No save done yet !")
+        else:
+            # get column width
+            width = dict()
+            width['name_width'] = max(max([len(x) for x in app_list]), len(CLIView.C_HEADER_APPS))
+            width['file_width'] = max(max([len(', '.join(x.files)) for x in atom_list]), len(CLIView.C_HEADER_FILES))
+            width['db_width'] = max(max([len(', '.join(x.databases)) for x in atom_list]), len(CLIView.C_HEADER_DB))
+            width['comment_width'] = CLIView.comment_width(saves, app_list)
+
+            # header
+            print(CLIView.C_SAVE_HEADER.format(*CLIView.C_SAVE_COLUMNS, **width))
+            # lines
+            for name in app_list:
+                save_atom = saves[name].save_atom
+                comment = '--exclude ' + ' '.join(['file:{}'.format(x) for x in save_atom.files]) + ' ' + ' '.join(
+                    ['database:{}'.format(x) for x in save_atom.databases])
+                print(
+                    CLIView.C_SAVE_LINE.format(
+                        name,
+                        ', '.join(save_atom.files),
+                        ', '.join(save_atom.databases),
+                        comment,
+                        **width
+                    )
                 )
-            )
 
     @staticmethod
     def print_restoreable_apps(saves):
