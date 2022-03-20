@@ -27,6 +27,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with snr.  If not, see <http://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
+from snr.app import SaveAtom
 
 
 class CLIView:
@@ -61,8 +62,11 @@ class CLIView:
     def atom_list(saves, app_list):
         atom_list = list()
         for app in app_list:
-            for date in saves[app].save_atoms:
-                atom_list.append(saves[app].save_atoms[date])
+            if len(saves[app].save_atoms) == 0:
+                atom_list.append(SaveAtom())
+            else:
+                for date in saves[app].save_atoms:
+                    atom_list.append(saves[app].save_atoms[date])
         return atom_list
 
     @staticmethod
@@ -71,32 +75,30 @@ class CLIView:
         print("Apps available for save: {}\n".format(', '.join(app_list)))
 
         atom_list = CLIView.atom_list(saves, app_list)
-        if len(atom_list) == 0:
-            print("No save done yet !")
-        else:
-            # get column width
-            width = dict()
-            width['name_width'] = max(max([len(x) for x in app_list]), len(CLIView.C_HEADER_APPS))
-            width['file_width'] = max(max([len(', '.join(x.files)) for x in atom_list]), len(CLIView.C_HEADER_FILES))
-            width['db_width'] = max(max([len(', '.join(x.databases)) for x in atom_list]), len(CLIView.C_HEADER_DB))
-            width['comment_width'] = CLIView.comment_width(saves, app_list)
 
-            # header
-            print(CLIView.C_SAVE_HEADER.format(*CLIView.C_SAVE_COLUMNS, **width))
-            # lines
-            for name in app_list:
-                save_atom = saves[name].save_atom
-                comment = '--exclude ' + ' '.join(['file:{}'.format(x) for x in save_atom.files]) + ' ' + ' '.join(
-                    ['database:{}'.format(x) for x in save_atom.databases])
-                print(
-                    CLIView.C_SAVE_LINE.format(
-                        name,
-                        ', '.join(save_atom.files),
-                        ', '.join(save_atom.databases),
-                        comment,
-                        **width
-                    )
+        # get column width
+        width = dict()
+        width['name_width'] = max(max([len(x) for x in app_list]), len(CLIView.C_HEADER_APPS))
+        width['file_width'] = max(max([len(', '.join(x.files)) for x in atom_list]), len(CLIView.C_HEADER_FILES))
+        width['db_width'] = max(max([len(', '.join(x.databases)) for x in atom_list]), len(CLIView.C_HEADER_DB))
+        width['comment_width'] = CLIView.comment_width(saves, app_list)
+
+        # header
+        print(CLIView.C_SAVE_HEADER.format(*CLIView.C_SAVE_COLUMNS, **width))
+        # lines
+        for name in app_list:
+            save_atom = saves[name].save_atom
+            comment = '--exclude ' + ' '.join(['file:{}'.format(x) for x in save_atom.files]) + ' ' + ' '.join(
+                ['database:{}'.format(x) for x in save_atom.databases])
+            print(
+                CLIView.C_SAVE_LINE.format(
+                    name,
+                    ', '.join(save_atom.files),
+                    ', '.join(save_atom.databases),
+                    comment,
+                    **width
                 )
+            )
 
     @staticmethod
     def print_restoreable_apps(saves):
@@ -106,7 +108,7 @@ class CLIView:
         # get column width
         width = dict()
         width['name_width'] = max(max([len(x) for x in app_list]), len(CLIView.C_HEADER_APPS))
-        width['date_width'] = max(max([len(x.date) for x in atom_list]) + len(" (Default)"), len(CLIView.C_HEADER_DATE))
+        width['date_width'] = max(max([len(x.date) for x in atom_list if x.date]) + len(" (Default)"), len(CLIView.C_HEADER_DATE))
         width['status_width'] = max(max([len(x.status.value) for x in atom_list]), len(CLIView.C_HEADER_STATUS))
         width['file_width'] = max(max([len(x.print_files()) for x in atom_list]), len(CLIView.C_HEADER_FILES))
         width['db_width'] = max(max([len(x.print_databases()) for x in atom_list]), len(CLIView.C_HEADER_DB))
