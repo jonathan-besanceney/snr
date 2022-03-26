@@ -546,7 +546,7 @@ compression_helpers:
             compressed_size_bytes = os.stat(compressed_file).st_size
             compressed_size = Units.convert_bytes(compressed_size_bytes)
             ratio = round(compressed_size_bytes / original_size_bytes, ndigits=2)
-            time_spent = Units.convert_seconds(seconds)
+            time_spent = seconds
             bitrate = Units.get_bitrate(original_size_bytes, seconds)
             return Compression._print_stats(
                 compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode
