@@ -516,7 +516,7 @@ compression_helpers:
         compressed_size_bytes = int(data_line[output['compressed_size_index']])
         compressed_size = Units.convert_bytes(compressed_size_bytes)
         ratio = data_line[output['ratio_index']]
-        time_spent = Units.convert_seconds(seconds)
+        time_spent = seconds
         bitrate = Units.get_bitrate(original_size_bytes, seconds)
 
         return Compression._print_stats(
@@ -555,16 +555,16 @@ compression_helpers:
     @staticmethod
     def _print_stats(compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode):
         if mode == CMode.COMPRESS:
-            stats = 'Compressed {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Compressed {file} of {compressed_size} in {time_spent}s. ' \
                     'Compression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
         elif mode == CMode.DUMP:
-            stats = 'Dumped {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Dumped {file} of {compressed_size} in {time_spent}s. ' \
                     'Dump bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
         elif mode == CMode.DECOMPRESS:
-            stats = 'Decompressed {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Decompressed {file} of {compressed_size} in {time_spent}s. ' \
                     'Decompression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
         elif mode == CMode.RESTORE:
-            stats = 'Restored {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Restored {file} of {compressed_size} in {time_spent}s. ' \
                     'Restoration bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
 
         return stats.format(

@@ -351,12 +351,11 @@ databases:
 
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
-                seconds = time.time() - start
                 logger.info(
-                    "apps[{}].databases[{}{}].save(): {}".format(
+                    "apps[{}].databases[{}{}].save(): {}s".format(
                         appname, db_prefix, dbname,
                         self._compression.get_pipe_statistics(
-                            compressed_filename, seconds, CMode.DUMP, appname, db_prefix, dbname
+                            compressed_filename, time.time() - start, CMode.DUMP, appname, db_prefix, dbname
                         )
                     )
                 )
