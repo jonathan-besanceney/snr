@@ -157,6 +157,10 @@ apps:
 
         self._save_atom = SaveAtom(db_names, file_names)
 
+    @property
+    def name(self):
+        return self._name
+
     @staticmethod
     def get_instances(conf):
         try:

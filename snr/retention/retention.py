@@ -30,6 +30,7 @@
 
 import os
 import logging
+import time
 from datetime import datetime
 
 from snr.app import App
@@ -154,7 +155,6 @@ retention:
         except (TypeError, KeyError) as e:
             logger.error("Cannot initialize retentions : {}".format(e))
 
-
     @staticmethod
     def _make_file_dict(path, extensions):
         """
@@ -201,23 +201,35 @@ retention:
         return all_wanted_file
 
     @staticmethod
-    def _remove_unwanted_files(files, wanted_files):
+    def _remove_unwanted_files(files, wanted_files, appname):
         """
         Delete all files not in wanted list
         :param files: all save files
         :type files: dict
         :param wanted_files: files to keep
         :type wanted_files: set
+        :param appname: application name as per config
+        :type appname: str
+        :return: number of deleted files
         """
+        count = 0
         for path in files.keys():
             del_files = set(files[path].keys()).difference(wanted_files)
             for file in del_files:
-                logger.info("Deleting {}".format(file))
+                logger.info("apps[{}]: Deleting {}".format(appname, file))
                 os.remove(file)
+                count += 1
+        return count
 
-    def run(self, path):
-        logger.info("Starting retention on {}".format(path))
+    def run(self, path, appname):
+        start = time.time()
+        logger.info("apps[{}]: Starting retention on {}".format(appname, path))
         files = Retention._make_file_dict(path, self._extensions)
         wanted_files = self._get_matching_files(files)
-        Retention._remove_unwanted_files(files, wanted_files)
+        count = Retention._remove_unwanted_files(files, wanted_files, appname)
+        logger.info(
+            "apps[{}]: Finished retention on {}. Deleted {} files in {}s".format(
+                appname, path, count, time.time()-start
+            )
+        )
 

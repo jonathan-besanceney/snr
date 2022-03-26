@@ -278,8 +278,19 @@ saves:
         :return: filled save_atom
         :rtype: snr.app.SaveAtom
         """
+        if save_atom:
+            save_intent = save_atom.status if not AppSaveStatusEnum.UNDEFINED else AppSaveStatusEnum.FULL
+        else:
+            save_intent = AppSaveStatusEnum.FULL
+
+        logger.info(
+            "apps[{}].save(): Starting {} save".format(
+                self._name,
+                save_intent.value
+            )
+        )
         if not self.restoreable:
-            logger.error('{} has no save right !'.format(self._name))
+            logger.error('apps[{}]: {} has no save right !'.format(self._app.name, self._name))
             return
 
         start = time.time()
@@ -292,17 +303,18 @@ saves:
         if len(self._retentions) > 0:
             if Save.C_SAVE_RETENTION_DBS in self._retentions.keys() and save_atom.databases_root_path:
                 dbs_retention = Retention.get_instance(self._conf, self._retentions[Save.C_SAVE_RETENTION_DBS])
-                dbs_retention.run(save_atom.databases_root_path)
+                dbs_retention.run(save_atom.databases_root_path, self._app.name)
 
             if Save.C_SAVE_RETENTION_FILES in self._retentions.keys() and save_atom.files_root_path:
                 files_retention = Retention.get_instance(self._conf, self._retentions[Save.C_SAVE_RETENTION_FILES])
-                files_retention.run(save_atom.files_root_path)
+                files_retention.run(save_atom.files_root_path, self._app.name)
 
-        logger.info("{} save done in {}s".format(self._name, time.time()-start))
-        if save_atom.status != AppSaveStatusEnum.FULL:
-            logger.warning("{} save is {}".format(self._name, save_atom.status.value))
+        logger.info("apps[{}]: {} save done in {}s".format(self._app.name, self._name, time.time()-start))
+        if save_atom.status != save_intent:
+            logger.error("apps[{}]: Finished {} save".format(self._app.name, save_atom.status.value))
         else:
-            logger.info("{} save is {}".format(self._name, save_atom.status.value))
+            logger.info("apps[{}]: Finished {} save".format(self._app.name, save_atom.status.value))
+
         return save_atom
 
     @property
@@ -343,26 +355,35 @@ saves:
         :param allow_partial: Optional. Allow restoration of a partial save. FULL per default.
         :type allow_partial: snr.app.AppSaveStatusEnum
         """
+        logger.info("apps[{}].restore(): Starting {} restore".format(self._name, allow_partial.value))
         if not self.restoreable:
-            logger.error('{} has no restore right !'.format(self._name))
+            logger.error('apps[{}]: {} has no restore right !'.format(self._app.name, self._name))
             return
 
         if save_atom is None and date is None:
             save_atom = self.last_save
             if save_atom is None:
-                logger.error("I have nothing to restore !")
+                logger.error("apps[{}]: I have nothing to restore !".format(self._app.name))
                 return
 
         if date is not None and save_atom is None:
             if date not in self.save_atoms.keys():
                 logger.error(
-                    "You picked up a wrong save date {}. Valid one are {}".format(date, self.save_atoms.keys())
+                    "apps[{}]: You picked up a wrong save date {}. Valid one are {}".format(
+                        self._app.name, date, self.save_atoms.keys()
+                    )
                 )
                 return
             else:
                 save_atom = self.save_atoms[date]
-
-        self._app.restore(save_atom, allow_partial)
+        try:
+            self._app.restore(save_atom, allow_partial)
+        except KeyboardInterrupt:
+            logger.warning(
+                "apps[{}].restore(): Interrupted".format(self._name)
+            )
+            raise
+        logger.info("apps[{}].restore(): Finished {} restore".format(self._name, allow_partial.value))
 
     @property
     def saveable(self):
