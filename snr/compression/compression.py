@@ -217,19 +217,23 @@ compression_helpers:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-    def compress_from_pipe(self, pipe, destination):
+    def compress_from_pipe(self, pipe, destination, appname, dbname):
         """
         Compress stream from pipe to destination.
         Compression extension will be added to destination file.
         :param pipe: will be used as stdin for the compression process.
         :type pipe: subprocess.PIPE
-        :param destination: destination file without extention
+        :param destination: destination file without extension
         :type destination: str
+        :param appname: application name as per config
+        :type appname: str
+        :param dbname: filename name as per config
+        :type dbname: str
         :return: compressed file name, None on error
         :rtype: Union[str|None]
         """
         if pipe is None:
-            logger.error("Pipe is None, aborting compress_from_pipe()")
+            logger.error("apps[{}].databases[{}]: Pipe is None, aborting compress_from_pipe()".format(appname, dbname))
             return None
 
         self._create_folder(destination)
@@ -238,7 +242,9 @@ compression_helpers:
         for env in self._compress_env.keys():
             os.environ[env] = self._compress_env[env]
 
-        logger.info("running {}".format(self._compress_from_pipe))
+        logger.info(
+            "apps[{}].databases[{}]: Pipe database dump to {}".format(appname, dbname, self._compress_from_pipe)
+        )
         with open(destination, 'wb') as f:
             p = subprocess.Popen(self._compress_from_pipe, stdin=pipe, stdout=f)
 
@@ -248,10 +254,10 @@ compression_helpers:
         if p.returncode == 0:
             return destination
 
-        logger.error(p)
+        logger.error("apps[{}].databases[{}]: {}".format(appname, dbname, p))
         return None
 
-    def compress(self, source, destination):
+    def compress(self, source, destination, appname, filename):
         """
         Compress source directory to destination file. Compress extension will be appended to destination file.
         Abort and delete partial file on any error.
@@ -260,11 +266,15 @@ compression_helpers:
         :type source: str
         :param destination: destination file without extension
         :type destination: str
+        :param appname: application name as per config
+        :type appname: str
+        :param filename: filename name as per config
+        :type filename: str
         :return: destination or None if error
         :rtype: Union[str|None]
         """
         if not os.path.exists(source):
-            logger.error("{} does not exist. Aborting compress()".format(source))
+            logger.error("apps[{}].files[{}]: {} does not exist. Aborting compress()".format(appname, filename, source))
             return None
 
         destination = "{}.{}".format(destination, self._compressed_extention)
@@ -282,8 +292,10 @@ compression_helpers:
         try:
             start = time.time()
             Compression._create_folder(destination)
-            logger.info("Compress {} to {}".format(source, destination))
-            logger.info("running {}".format(cmd))
+            logger.info("apps[{}].files[{}]: Compress {} to {} with {}".format(
+                appname, filename, source, destination, cmd
+            ))
+
             p = subprocess.Popen(cmd, stderr=subprocess.PIPE, cwd=source)
             err_count = 0
             with p.stderr as err:
@@ -291,7 +303,11 @@ compression_helpers:
                     # avoid stopping tar when issuing 'Removing leading `/' from member names'
                     if err_count > 0:
                         msg = msg.decode().replace('\n', '')
-                        logger.error("Compression {} to {} : {}".format(source, destination, msg))
+                        logger.error(
+                            "apps[{}].files[{}]: Compression {} to {} : {}".format(
+                                appname, filename, source, destination, msg
+                            )
+                        )
                         raise ChildProcessError(msg)
                     err_count += 1
 
@@ -301,28 +317,41 @@ compression_helpers:
                 original_size = self.get_folder_size(source)
                 if original_size == 0:
                     logger.warning(
-                        "{} folder content is 0 byte. Please check your configuration: "
-                        "One apps->name->files might refer to empty folder and should be set to NULL.".format(source)
+                        "apps[{}].files[{}]: {} folder content is 0 byte. Please check your configuration: "
+                        "One apps->name->files might refer to empty folder and should be set to NULL.".format(
+                            appname, filename, source
+                        )
                     )
                 else:
-                    logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
+                    logger.info(
+                        "apps[{}].files[{}]: {}".format(
+                            appname, filename,
+                            Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS)
+                        )
+                    )
                 return destination
             logger.error(p)
             return None
         except KeyboardInterrupt:
             if p:
-                logger.warning("Caught keyboard interrupt. Terminating compression of {}".format(source))
+                logger.warning(
+                    "apps[{}].files[{}]: Caught keyboard interrupt. Terminating compression of {}".format(
+                        appname, filename, source
+                    )
+                )
                 p.terminate()
-                logger.warning("Deleting partial file {}".format(destination))
+                logger.warning("apps[{}].files[{}]: Deleting partial file {}".format(appname, filename, destination))
                 Compression.delete(destination)
                 return None
         except ChildProcessError:
             p.terminate()
-            logger.warning("Deleting partial file {}".format(destination))
+            logger.warning("apps[{}].files[{}]: Deleting partial file {}".format(appname, filename, destination))
             Compression.delete(destination)
             return None
         except PermissionError as e:
-            logger.error("Cannot create directory {} : {}".format(destination, e))
+            logger.error(
+                "apps[{}].files[{}]: Cannot create directory {} : {}".format(appname, filename, destination, e)
+            )
             return None
 
     @staticmethod
@@ -336,71 +365,92 @@ compression_helpers:
             logger.info("Deleting {}".format(file))
             os.remove(file)
 
-    def decompress_to_pipe(self, file):
+    def decompress_to_pipe(self, file, appname, db_prefix, dbname):
         """
         Decompress a file and return stream (stdout)
         :param file: file to decompress
         :type file: str
+        :param appname: application name as per config
+        :type appname: str
+        :param db_prefix: database prefix as per config
+        :type db_prefix: str
+        :param dbname: database name as per config
+        :type dbname: str
         :return: decompressed stream
         :rtype: subprocess.PIPE
         """
         if not os.path.exists(file):
-            logger.error("{} does not exists. Aborting decompress_to_pipe().".format(file))
+            logger.error("apps[{}].databases[{}{}]: {} does not exists. Aborting decompress_to_pipe().".format(
+                appname, db_prefix, dbname, file
+            ))
             return None
         cmd = list()
         for arg in self._decompress_to_pipe:
             cmd.append(Template(arg).safe_substitute(file=file))
-        logger.info("running {}".format(cmd))
+        logger.info("apps[{}].databases[{}{}]: Extract dump with {}".format(appname, db_prefix, dbname, cmd))
         return subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
-    def decompress(self, file, destination):
+    def decompress(self, file, destination, appname, filename):
         """
         Decompress file in destination folder
         :param file: file to decompress
         :type file: str
         :param destination: destination folder
         :type destination: str
+        :param appname: application name as per config
+        :type appname: str
+        :param filename: file name as per config
+        :type filename: str
         :return: destination folder, None on error
         :rtype: Union[str|None]
         """
         start = time.time()
         if not os.path.exists(file):
-            logger.error("Source {} does not exists. Aborting decompress().".format(file))
+            logger.error(
+                "apps[{}].files[{}]: Source {} does not exists. Aborting decompress().".format(appname, filename, file)
+            )
             return None
 
         if not os.path.exists(destination):
-            logger.warning("Creating dir {}".format(destination))
+            logger.warning("apps[{}].files[{}]: Creating dir {}".format(appname, filename, destination))
             try:
                 Compression._create_folder(destination, is_dir=True)
             except PermissionError as e:
-                logger.error("Cannot create directory {} : {}".format(destination, e))
+                logger.error(
+                    "apps[{}].files[{}]: Cannot create directory {} : {}".format(appname, filename, destination, e)
+                )
                 return None
 
         cmd = list()
         for arg in self._decompress_command:
             cmd.append(Template(arg).safe_substitute(file=file))
-        logger.info("Decompress {} to {}".format(file, destination))
-        logger.info("running {}".format(cmd))
+        logger.info("apps[{}].files[{}]: Decompress {} to {} with {}".format(appname, filename, file, destination, cmd))
+
         try:
             p = subprocess.run(cmd, cwd=destination)
             if p.returncode == 0:
                 seconds = time.time() - start
                 original_size = self.get_folder_size(destination)
-                logger.info(Compression.get_statistics(original_size, file, seconds, CMode.DECOMPRESS))
+                logger.info(
+                    "apps[{}].files[{}]: {}".format(
+                        appname, filename,
+                        Compression.get_statistics(original_size, file, seconds, CMode.DECOMPRESS)
+                    )
+                )
                 return destination
             logger.error(p)
             return None
         except KeyboardInterrupt:
-            logger.warning("Caught KeyboardInterrupt !")
+            logger.warning("apps[{}].files[{}]: Caught KeyboardInterrupt !")
             return None
         except ChildProcessError as e:
-            logger.warning("{}".format(e))
+            logger.warning("apps[{}].files[{}]: {}".format(appname, filename, e))
             return None
         except PermissionError as e:
-            logger.error("Cannot read {} : {}".format(destination, e))
+            logger.error("apps[{}].files[{}]: Cannot read {} : {}".format(appname, filename, destination, e))
             return None
         except FileNotFoundError as e:
-            logger.error("Cannot decompress in {} : {}".format(destination, e))
+            logger.error("apps[{}].files[{}]: Cannot decompress in {} : {}".format(appname, filename, destination, e))
             return None
 
     @staticmethod
@@ -415,7 +465,7 @@ compression_helpers:
         root_directory = Path(folder)
         return sum(f.stat().st_size for f in root_directory.glob('**/*') if f.is_file())
 
-    def get_pipe_statistics(self, file, seconds, mode):
+    def get_pipe_statistics(self, file, seconds, mode, appname, db_prefix, dbname):
         """
         :param file: compressed file path
         :type file: str
@@ -423,6 +473,12 @@ compression_helpers:
         :type seconds: float
         :param mode: Display stats for COMPRESSION or DECOMPRESSION
         :type mode: CMode
+        :param appname: application name as per config
+        :type appname: str
+        :param db_prefix: database prefix as per config
+        :type db_prefix: str
+        :param dbname: database name as per config
+        :type dbname: str
         :return: statistics
         :rtype: str
         """
@@ -439,7 +495,7 @@ compression_helpers:
         else:
             return
 
-        logger.info("running {}".format(cmd))
+        logger.info("apps[{}].databases[{}{}]: Getting statistics from {}".format(appname, db_prefix, dbname, cmd))
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         lines = list()
         with p.stdout as out:
@@ -449,7 +505,11 @@ compression_helpers:
 
         original_size_bytes = int(data_line[output['uncompressed_size_index']])
         if original_size_bytes == 0:
-            logger.warning("Can't read following output to compute stats: {}".format(data_line))
+            logger.warning(
+                "apps[{}].databases[{}{}]: Can't read following output to compute stats: {}".format(
+                    appname, db_prefix, dbname, data_line
+                )
+            )
             return "Will not compute stats for {} due to previous error.".format(file)
 
         original_size = Units.convert_bytes(original_size_bytes)

@@ -2,6 +2,7 @@ database_helpers:
   postgres:
     env:
       PGPASSWORD: '$password'
+      #LC_LANG: 'C'
     dump_command: [
       '/usr/bin/pg_dump',
       '--host=$host',
@@ -56,6 +57,7 @@ database_helpers:
   mysql:
     env:
       MYSQL_PWD: '$password'
+      #LC_LANG: 'C'
     dump_command: [
       '/usr/bin/mysqldump',
       '--host=$host',
