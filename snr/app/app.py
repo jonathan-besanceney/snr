@@ -155,7 +155,7 @@ apps:
         for file in self._files.keys():
             file_names.append(file)
 
-        self._save_atom = SaveAtom(db_names, file_names)
+        self._save_atom = SaveAtom(name, db_names, file_names)
 
     @property
     def name(self):
@@ -222,8 +222,9 @@ apps:
         except IOError as e:
             logger.error("{} does not exist".format(conf))
 
-    def _format_destination(self, destination, save_type, name, file):
-        today = datetime.today().strftime(App.C_DATE_FORMAT)
+    def _format_destination(self, destination, save_type, name, file, today=None):
+        if not today:
+            today = datetime.today().strftime(App.C_DATE_FORMAT)
         return Template(destination).safe_substitute(
             app=self._name,
             type=save_type,
@@ -262,24 +263,24 @@ apps:
         :type save_atom: Union[SaveAtom|None]
         :return: SaveAtom instance filed with save files
         """
-        logger.info("apps[{}].save(): Starting save".format(self._name))
+
         if save_atom is None:
             save_atom = self.save_atom
 
         try:
             start = time.time()
 
-            # don't start if we are at one second to the next minute to avoid time stamping issue for a complete save
-            if datetime.today().second == 59:
-                time.sleep(1.1)
+            logger.info("{}.save(): Starting save {}".format(save_atom.app_log_prefix(), save_atom.date))
 
             # file save
             file_threads = list()
             for file in self._files:
                 if file in save_atom.files:
-                    save_path = self._format_destination(destination, App.C_FILES, file, file)
+                    save_path = self._format_destination(destination, App.C_FILES, file, file, save_atom.date)
                     save_atom.set_file(file, self._compression.get_file_with_compressed_extension(save_path))
-                    compress = functools.partial(self._compression.compress, self._files[file], save_path, self._name, file)
+                    compress = functools.partial(
+                        self._compression.compress, self._files[file], save_path, save_atom, file
+                    )
                     t = Thread(target=compress, name=file)
                     t.start()
                     file_threads.append(t)
@@ -288,7 +289,7 @@ apps:
             for db in self._databases:
                 if db[App.C_DB_NAME] in save_atom.databases:
                     save_path = self._format_destination(
-                        destination, App.C_DBS, db[App.C_DB_NAME], db[App.C_DATABASE_NAME]
+                        destination, App.C_DBS, db[App.C_DB_NAME], db[App.C_DATABASE_NAME], save_atom.date
                     )
                     save_atom.set_database(
                         db[App.C_DB_NAME],
@@ -298,14 +299,14 @@ apps:
                         db[App.C_DB_INSTANCE].save,
                         db[App.C_DATABASE_NAME],
                         save_path,
-                        self._name,
+                        save_atom,
                         self._get_database_attr(db, App.C_DATABASE_PREFIX)
                     )
                     t = Thread(target=save, name=db[App.C_DB_NAME])
                     t.start()
                     db_threads.append(t)
             if len(db_threads) + len(file_threads) == 0:
-                logger.warning("apps[{}].save(): Nothing to do !".format(self._name))
+                logger.warning("{}.save(): Nothing to do !".format(save_atom.app_log_prefix()))
                 return
 
             # wait for them
@@ -323,10 +324,12 @@ apps:
                     save_atom.set_file(t.name, None)
 
         except KeyboardInterrupt:
-            logger.warning("apps[{}].save(): User interruption, trying to kill remaining processes".format(self._name))
+            logger.warning(
+                "{}.save(): User interruption, trying to kill remaining processes".format(save_atom.app_log_prefix())
+            )
             raise
 
-        logger.info("apps[{}].save(): Finished save in {}s".format(self._name, time.time()-start))
+        logger.info("{}.save(): Finished save in {}s".format(save_atom.app_log_prefix(), time.time()-start))
         return save_atom
 
     def _update_save_atoms(self, source, save_type, name, save_atoms):
@@ -437,15 +440,15 @@ apps:
         :type allow_status: AppSaveStatusEnum
         :return:
         """
-        logger.info("apps[{}].restore(): Starting restore".format(self._name))
+        logger.info("{}.restore(): Starting restore".format(save_atom.app_log_prefix()))
         start = time.time()
         if save_atom.status == AppSaveStatusEnum.UNDEFINED:
-            logger.error("apps[{}].restore(): Save atom is undefined !".format(self._name))
+            logger.error("{}.restore(): Save atom is undefined !".format(save_atom.app_log_prefix()))
         if save_atom.status != AppSaveStatusEnum.FULL and save_atom.status != allow_status:
             logger.error(
-                "apps[{}].restore(): The selected save is {}, "
+                "{}.restore(): The selected save is {}, "
                 "you must set allow_status=AppSaveStatusEnum.PARTIAL to allow a restore.".format(
-                    self._name, save_atom
+                    save_atom.app_log_prefix(), save_atom
                 )
             )
             return
@@ -465,7 +468,7 @@ apps:
                     self._compression.decompress,
                     save_atom.get_file(f),
                     self._files[f],
-                    self._name,
+                    save_atom,
                     f
                 )
                 t = Thread(target=decompress, name=f)
@@ -479,7 +482,7 @@ apps:
                 db_instance.restore,
                 d,
                 save_atom.get_database(d),
-                self._name,
+                save_atom,
                 self._get_database_attr(d, App.C_DATABASE_PREFIX),
                 self._get_database_attr(d, Database.D_CREDS)
             )
@@ -488,15 +491,19 @@ apps:
             threads.append(t)
 
         if len(threads) == 0:
-            logger.warning("apps[{}].restore(): Nothing to do !".format(self._name))
+            logger.warning("{}.restore(): Nothing to do !".format(save_atom.app_log_prefix()))
         else:
             try:
                 # wait for them
                 for t in threads:
                     t.join()
-                logger.info("apps[{}].restore(): Finished restore in {}s".format(self._name, time.time() - start))
+                logger.info(
+                    "{}.restore(): Finished restore in {}s".format(save_atom.app_log_prefix(), time.time() - start)
+                )
             except KeyboardInterrupt:
                 logger.warning(
-                    "apps[{}].restore(): User interruption, trying to kill remaining processes".format(self._name)
+                    "{}.restore(): User interruption, trying to kill remaining processes".format(
+                        save_atom.app_log_prefix()
+                    )
                 )
                 raise

@@ -314,19 +314,18 @@ databases:
                 if env in os.environ:
                     del os.environ[env]
 
-    def save(self, dbname, file, appname, db_prefix=""):
+    def save(self, dbname, file, save_atom, db_prefix=""):
         """
         Launch db dump command and pipe it to compression helper
         :param dbname:
         :param file:
-        :param appname:
+        :param save_atom:
         :param db_prefix:
         """
         if '{}{}'.format(db_prefix, dbname) not in self.databases:
             logger.error(
-                "apps[{}].databases[{db_prefix}{dbname}].save(): "
-                "Can't save database '{db_prefix}{dbname}'. This database does not exist !".format(
-                    appname, db_prefix=db_prefix, dbname=dbname
+                "{}.save(): Can't save database '{db_prefix}{dbname}'. This database does not exist !".format(
+                    save_atom.db_log_prefix(db_prefix, dbname), db_prefix=db_prefix, dbname=dbname
                 )
             )
             return
@@ -338,11 +337,13 @@ databases:
         # prepare command
         cmd = self._prepare_command(self._dump_command, dbname)
 
-        logger.info("apps[{}].databases[{}{}].save(): Dump database with {}".format(appname, db_prefix, dbname, cmd))
+        logger.info("{}.save(): Dump database with {}".format(save_atom.db_log_prefix(db_prefix, dbname), cmd))
 
         try:
             self._dump_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            compressed_filename = self._compression.compress_from_pipe(self._dump_process.stdout, file, appname, dbname)
+            compressed_filename = self._compression.compress_from_pipe(
+                self._dump_process.stdout, file, save_atom, db_prefix, dbname
+            )
             if not self._dump_process.stdout.closed:
                 self._dump_process.stdout.close()
 
@@ -352,23 +353,23 @@ databases:
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
                 logger.info(
-                    "apps[{}].databases[{}{}].save(): {}s".format(
-                        appname, db_prefix, dbname,
+                    "{}.save(): {}s".format(
+                        save_atom.db_log_prefix(db_prefix, dbname),
                         self._compression.get_pipe_statistics(
-                            compressed_filename, time.time() - start, CMode.DUMP, appname, db_prefix, dbname
+                            compressed_filename, time.time() - start, CMode.DUMP, save_atom, db_prefix, dbname
                         )
                     )
                 )
             else:
                 logger.error(
-                    "apps[{}].databases[{}{}].save(): Database dump ended with exit code {}".format(
-                        appname, db_prefix, dbname, self._dump_process.returncode
+                    "{}.save(): Database dump ended with exit code {}".format(
+                        save_atom.db_log_prefix(db_prefix, dbname), self._dump_process.returncode
                     )
                 )
                 if not self._dump_process.stderr.closed:
                     logger.error(
-                        "apps[{}].databases[{}{}].save(): {}".format(
-                            appname, db_prefix, dbname, self._dump_process.stderr.read().decode()
+                        "{}.save(): {}".format(
+                            save_atom.db_log_prefix(db_prefix, dbname), self._dump_process.stderr.read().decode()
                         )
                     )
 
@@ -376,34 +377,33 @@ databases:
                 self._dump_process.stderr.close()
         except KeyboardInterrupt:
             logger.warning(
-                "apps[{}].databases[{}{}].save(): Caught KeyboardInterrupt !".format(appname, db_prefix, dbname)
+                "{}.save(): Caught KeyboardInterrupt !".format(save_atom.db_log_prefix(db_prefix, dbname))
             )
 
-    def restore(self, dbname, backup, appname, db_prefix='', credentials=None):
+    def restore(self, dbname, backup, save_atom, db_prefix='', credentials=None):
         """
         restore a database
         :param dbname:
         :param backup:
-        :param appname:
+        :param save_atom:
         :param db_prefix:
         :param credentials:
         :return:
         """
         if '{}{}'.format(db_prefix, dbname) not in self.databases:
             logger.warning(
-                "apps[{}].databases[{db_prefix}{dbname}].restore(): "
-                "Database {db_prefix}{dbname} does not exist. Trying to create it.".format(
-                    appname, db_prefix=db_prefix, dbname=dbname
+                "{}.restore(): Database {}{} does not exist. Trying to create it.".format(
+                    save_atom.db_log_prefix(db_prefix, dbname), db_prefix, dbname
                 ))
 
-            if not self.create_database(appname, dbname, db_prefix):
+            if not self.create_database(save_atom, dbname, db_prefix):
                 return
 
             if credentials:
                 if not self.create_user(
                         credentials[Database.C_USER],
                         credentials[Database.C_PASS],
-                        appname,
+                        save_atom,
                         dbname,
                         db_prefix
                 ):
@@ -414,10 +414,10 @@ databases:
         self._prepare_env()
         cmd = self._prepare_command(self._restore_command, dbname, db_prefix)
         try:
-            extract_process = self._compression.decompress_to_pipe(backup, appname, dbname, db_prefix)
+            extract_process = self._compression.decompress_to_pipe(backup, save_atom, dbname, db_prefix)
             with extract_process.stdout as f:
-                logger.info("apps[{}].databases[{}{}].restore(): Pipe dump extraction to {}".format(
-                    appname, db_prefix, dbname, cmd
+                logger.info("{}.restore(): Pipe dump extraction to {}".format(
+                    save_atom.db_log_prefix(db_prefix, dbname), cmd
                 ))
                 restore_process = subprocess.Popen(cmd, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             _, err = restore_process.communicate()
@@ -427,39 +427,31 @@ databases:
             if restore_process.returncode == 0:
                 if len(err) != 0:
                     logger.warning(
-                        "apps[{}].databases[{}{}].restore(): {}".format(
-                            appname, db_prefix, dbname,
+                        "{}.restore(): {}".format(
+                            save_atom.db_log_prefix(db_prefix, dbname),
                             err.decode().replace('\n', '')
                         )
                     )
                 seconds = time.time() - start
                 logger.info(
-                    "apps[{}].databases[{}{}].restore(): {}".format(
-                        appname, db_prefix, dbname,
+                    "{}.restore(): {}".format(
+                        save_atom.db_log_prefix(db_prefix, dbname),
                         self._compression.get_pipe_statistics(
-                            backup, seconds, CMode.RESTORE, appname, db_prefix, dbname
+                            backup, seconds, CMode.RESTORE, save_atom, db_prefix, dbname
                         )
                     )
                 )
 
             else:
-                logger.error(
-                    "apps[{}].databases[{}{}].restore(): {}".format(
-                        appname, db_prefix, dbname,
-                        err.decode()
-                    )
-                )
+                logger.error("{}.restore(): {}".format(save_atom.db_log_prefix(db_prefix, dbname), err.decode()))
         except KeyboardInterrupt:
-            logger.warning("apps[{}].databases[{}{}].restore(): Caught KeyboardInterrupt".format(
-                        appname, db_prefix, dbname
-            ))
+            logger.warning("{}.restore(): Caught KeyboardInterrupt".format(save_atom.db_log_prefix(db_prefix, dbname)))
 
-    def create_database(self, appname, dbname, db_prefix=''):
+    def create_database(self, save_atom, dbname, db_prefix=''):
         if '{}{}'.format(db_prefix, dbname) in self.databases:
             logger.error(
-                "apps[{}].databases[{db_prefix}{dbname}]: "
-                "Can't create database '{db_prefix}{dbname}'. This database already exist !".format(
-                    appname, db_prefix=db_prefix, dbname=dbname
+                "{}: Can't create database '{}{}'. This database already exist !".format(
+                    save_atom.db_log_prefix(db_prefix, dbname), db_prefix, dbname
                 )
             )
             return False
@@ -469,37 +461,37 @@ databases:
 
         self._prepare_env()
         cmd = self._prepare_command(self._create_database_command, dbname, db_prefix)
-        logger.info("apps[{}].databases[{}{}]: Creating database with {}".format(appname, db_prefix, dbname, cmd))
+        logger.info("{}: Creating database with {}".format(save_atom.db_log_prefix(db_prefix, dbname), cmd))
         p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         self._restore_env()
 
         if p.returncode == 0:
             logger.warning(
-                "apps[{}].databases[{db_prefix}{dbname}]: Database '{db_prefix}{dbname}' created".format(
-                    appname, db_prefix=db_prefix, dbname=dbname
+                "{}: Database '{}{}' created".format(
+                    save_atom.db_log_prefix(db_prefix, dbname), db_prefix, dbname
                 )
             )
             return True
         else:
-            logger.error("apps[{}].databases[{}{}]: {}".format(
-                appname, db_prefix, dbname, p.stderr.decode()
+            logger.error("{}: {}".format(
+                save_atom.db_log_prefix(db_prefix, dbname), p.stderr.decode()
             ))
             return False
 
-    def create_user(self, user, passwd, appname, dbname, db_prefix=''):
+    def create_user(self, user, passwd, save_atom, dbname, db_prefix=''):
         self._prepare_env()
         cmd = self._prepare_command(self._create_user_and_assign_command, dbname, db_prefix, user, passwd)
-        logger.info("apps[{}].databases[{}{}]: Creating user with {}".format(
-            appname, db_prefix, dbname, str(cmd).replace(passwd, "***")
+        logger.info("{}: Creating user with {}".format(
+            save_atom.db_log_prefix(db_prefix, dbname), str(cmd).replace(passwd, "***")
         ))
         p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         self._restore_env()
 
         if p.returncode == 0:
-            logger.warning("apps[{}].databases[{}{}]: User '{}' created".format(appname, db_prefix, dbname, user))
+            logger.warning("{}: User '{}' created".format(save_atom.db_log_prefix(db_prefix, dbname), user))
             return True
         else:
-            logger.error("apps[{}].databases[{}{}]: {}".format(appname, db_prefix, dbname, p.stderr.decode()))
+            logger.error("{}: {}".format(save_atom.db_log_prefix(db_prefix, dbname), p.stderr.decode()))
             return False
 
     @property

@@ -32,6 +32,7 @@ import os
 import logging
 import time
 from datetime import datetime
+from enum import Enum
 
 from snr.app import App
 
@@ -40,6 +41,11 @@ from snr.yamlhelper import YAMLHelper
 from snr.retention.period import PeriodDurationEnum, Periods
 
 logger = logging.getLogger(__name__)
+
+
+class RetentionTypeEnum(Enum):
+    DBS = "databases"
+    FILES = "files"
 
 
 class Retention:
@@ -75,7 +81,9 @@ retention:
         C_RETENTION_DAYS, C_RETENTION_WEEKS, C_RETENTION_MONTHS, C_RETENTION_QUARTERS, C_RETENTION_YEARS
     }
 
-    def __init__(self, name, last_days=5, last_weeks=1, last_months=-1, last_quarters=1, last_years=1, extensions=None):
+    def __init__(self, name,
+                 last_days=5, last_weeks=1, last_months=-1, last_quarters=1, last_years=1,
+                 extensions=None, retention_type=None):
         self._name = name
         self.last_days = Periods(PeriodDurationEnum.DAY, last_days)
         self.last_weeks = Periods(PeriodDurationEnum.WEEK, last_weeks)
@@ -83,15 +91,18 @@ retention:
         self.last_quarters = Periods(PeriodDurationEnum.QUARTER, last_quarters)
         self.last_years = Periods(PeriodDurationEnum.YEAR, last_years)
         self._extensions = extensions
+        self._retention_type = retention_type
 
     @staticmethod
-    def get_instance(conf, name):
+    def get_instance(conf, name, retention_type):
         """
         Load Retention configuration and return Retention named instance
         :param conf: file path to load
         :type conf: str
-        :param name: name of the instance to instanciate
+        :param name: name of the instance to instantiate
         :type name: str
+        :param retention_type: indicate whether it takes SaveAtom.databases_root_path or SaveAtom.files_root_path
+        :type retention_type: RetentionTypeEnum
         :return: Retention instance
         :rtype: Retention
         """
@@ -114,7 +125,8 @@ retention:
                         retention[Retention.C_RETENTION_MONTHS],
                         retention[Retention.C_RETENTION_QUARTERS],
                         retention[Retention.C_RETENTION_YEARS],
-                        compression.extensions
+                        compression.extensions,
+                        retention_type
                     )
             if instance is None:
                 logger.error("Retention {} does not exist. You must select one of {}".format(name, names))
@@ -201,35 +213,44 @@ retention:
         return all_wanted_file
 
     @staticmethod
-    def _remove_unwanted_files(files, wanted_files, appname):
+    def _remove_unwanted_files(files, wanted_files, save_atom):
         """
         Delete all files not in wanted list
         :param files: all save files
         :type files: dict
         :param wanted_files: files to keep
         :type wanted_files: set
-        :param appname: application name as per config
-        :type appname: str
+        :param save_atom: saveatom to retrieve app_log_prefix
+        :type save_atom: SaveAtom
         :return: number of deleted files
         """
         count = 0
         for path in files.keys():
             del_files = set(files[path].keys()).difference(wanted_files)
             for file in del_files:
-                logger.info("apps[{}]: Deleting {}".format(appname, file))
+                logger.info("{}: Deleting {}".format(save_atom.app_log_prefix(), file))
                 os.remove(file)
                 count += 1
         return count
 
-    def run(self, path, appname):
+    def run(self, save_atom):
+        """
+        runs retention on specified SaveAtom according to retention_type value
+        :param save_atom:
+        :type save_atom: SaveAtom
+        :return:
+        """
         start = time.time()
-        logger.info("apps[{}]: Starting retention on {}".format(appname, path))
+        path = save_atom.databases_root_path
+        if self._retention_type == RetentionTypeEnum.FILES:
+            path = save_atom.files_root_path
+
+        logger.info("{}: Starting retention on {}".format(save_atom.app_log_prefix(), path))
         files = Retention._make_file_dict(path, self._extensions)
         wanted_files = self._get_matching_files(files)
-        count = Retention._remove_unwanted_files(files, wanted_files, appname)
+        count = Retention._remove_unwanted_files(files, wanted_files, save_atom)
         logger.info(
-            "apps[{}]: Finished retention on {}. Deleted {} files in {}s".format(
-                appname, path, count, time.time()-start
+            "{}: Finished retention on {}. Deleted {} files in {}s".format(
+                save_atom.app_log_prefix(), path, count, time.time()-start
             )
         )
-

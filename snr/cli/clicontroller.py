@@ -142,11 +142,13 @@ logging:
                 if save_atom.part_exists(part, name):
                     save_atom.del_part(part, name)
                 else:
-                    print("Unrecognized {}:{}. {} should be one of {}".format(part, name, part, SaveAtom.PART_TYPES))
+                    logging.error(
+                        "Unrecognized {}:{}. {} should be one of {}".format(part, name, part, SaveAtom.PART_TYPES)
+                    )
                     sys.exit(1)
-                print("Excluding {} {} !".format(part, name))
+                logging.info("Excluding {} {} !".format(part, name))
         except TypeError as e:
-            print(e)
+            logging.error(e)
             sys.exit(1)
         return save_atom
 
@@ -158,14 +160,14 @@ logging:
             CLIView.print_saveable_apps(saves)
         else:
             if args.app not in saves.keys():
-                print("{} is not a registered app that can be saved !\n".format(args.app))
+                logging.error("{} is not a registered app that can be saved !\n".format(args.app))
                 CLIView.print_saveable_apps(saves)
             else:
                 save = saves[args.app]
                 save_atom = save.save_atom
                 if args.exclude:
                     save_atom = CLIController.exclude(save_atom, args.exclude)
-                print("Start saving {}...".format(args.app))
+                logging.info("Start saving {}...".format(args.app))
                 save.save(save_atom)
 
     @staticmethod
@@ -176,14 +178,14 @@ logging:
             CLIView.print_restoreable_apps(saves)
         else:
             if args.app not in saves.keys():
-                print("{} is not a registered app that can be restored !\n".format(args.app))
+                logging.error("{} is not a registered app that can be restored !\n".format(args.app))
                 CLIView.print_restoreable_apps(saves)
             else:
                 save = saves[args.app]
                 save_atom = save.last_save
                 if args.date:
                     if args.date not in save.save_atoms.keys():
-                        print(
+                        logging.error(
                             "{} is not an available save date for {}. Choose one of {}".format(
                                 args.date, args.app, ', '.join(sorted(save.save_atoms.keys(), reverse=True))
                             )
@@ -194,13 +196,13 @@ logging:
 
                 if args.exclude:
                     save_atom = CLIController.exclude(save_atom, args.exclude)
-                print("Start restoring {}...".format(args.app))
+                logging.info("Start restoring {}...".format(args.app))
                 save.restore(save_atom=save_atom, allow_partial=allow_partial)
 
     @staticmethod
     def genconf(args):
         if os.path.exists(args.conf):
-            print("{} already exists. Aborting sample configuration generation".format(args.conf))
+            logging.error("{} already exists. Aborting sample configuration generation".format(args.conf))
             sys.exit(1)
 
         # create dir
@@ -227,28 +229,30 @@ logging:
                 f.write(Save.C_YAML)
                 # logger
                 f.write(CLIController.C_LOGGER_YAML)
-            print("Sample configuration written in {}. You should edit it !".format(args.conf))
+            logging.info("Sample configuration written in {}. You should edit it !".format(args.conf))
         except PermissionError as e:
-            print("{}. Run as root if you intend to write in privileged folder".format(e))
+            logging.error("{}. Run as root if you intend to write in privileged folder".format(e))
 
     @staticmethod
     def create_systemd_service(args):
         try:
             if os.path.exists(CLIController.C_SYSTEMD_SERVICE_PATH):
-                print("{} already exists. Aborting systemd service creation".format(CLIController.C_SYSTEMD_SERVICE_PATH))
+                logging.error(
+                    "{} already exists. Aborting systemd service creation".format(CLIController.C_SYSTEMD_SERVICE_PATH)
+                )
                 sys.exit(1)
 
             with open(CLIController.C_SYSTEMD_SERVICE_PATH, 'w') as f:
                 f.write(CLIController.C_SYSTEMD_SERVICE)
 
-            print(
+            logging.info(
                 "Systemd service written in {} !".format(
                     CLIController.C_SYSTEMD_SERVICE_PATH
                 )
             )
-            print("Register service in boot with : systemctl daemon-reload && systemctl enable snr")
-            print("Start with : systemctl start snr")
-            print("Get current status with : systemctl status snr")
-            print("Get logs with : journalctl -u snr -ef")
+            logging.info("Register service in boot with : systemctl daemon-reload && systemctl enable snr")
+            logging.info("Start with : systemctl start snr")
+            logging.info("Get current status with : systemctl status snr")
+            logging.info("Get logs with : journalctl -u snr -ef")
         except PermissionError as e:
-            print("{}. Run as root if you intend to write in privileged folder".format(e))
+            logging.error("{}. Run as root if you intend to write in privileged folder".format(e))

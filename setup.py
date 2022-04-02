@@ -34,7 +34,7 @@ with open("README.md", 'r') as f:
 
 setup(
     name='snr',
-    version='1.11',
+    version='1.12',
     packages=['snr', 'snr.app', 'snr.cli', 'snr.log', 'snr.save', 'snr.database', 'snr.retention', 'snr.yamlhelper',
               'snr.compression', 'snr.units'],
     url='https://github.com/jonathan-besanceney/snr',
