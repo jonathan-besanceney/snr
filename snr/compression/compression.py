@@ -73,17 +73,6 @@ compression_helpers:
     '$destination',
     '$file'
   ]
-  compress_info_command: [
-    '/usr/bin/lzop',
-    '-l',
-    '$file'
-  ]
-  compress_info_command_output: {
-    'data_line': -1,
-    'compressed_size_index': 1,
-    'uncompressed_size_index': 2,
-    'ratio_index': 3
-  }
   compress_from_pipe: [
     '/usr/bin/xz'
     #'/usr/bin/lzop'
@@ -119,7 +108,6 @@ compression_helpers:
         'compressed_extention', 'compressed_from_pipe_ext', 'compress_env',
         'compress_command', 'decompress_command',
         'compress_from_pipe', 'decompress_to_pipe',
-        'compress_info_command', 'compress_info_command_output',
         'compress_from_pipe_info', 'compress_from_pipe_info_output'
     }
 
@@ -132,8 +120,6 @@ compression_helpers:
             decompress_command=None,
             compress_from_pipe=None,
             decompress_to_pipe=None,
-            compress_info_command=None,
-            compress_info_command_output=None,
             compress_from_pipe_info=None,
             compress_from_pipe_info_output=None
     ):
@@ -147,8 +133,6 @@ compression_helpers:
         self._decompress_command = decompress_command
         self._compress_from_pipe = compress_from_pipe
         self._decompress_to_pipe = decompress_to_pipe
-        self._compress_info_command = compress_info_command
-        self._compress_info_command_output = compress_info_command_output
         self._compress_from_pipe_info = compress_from_pipe_info
         self._compress_from_pipe_info_output = compress_from_pipe_info_output
 
@@ -494,12 +478,7 @@ compression_helpers:
         :return: statistics
         :rtype: str
         """
-        if file.endswith(self._compressed_extention):
-            cmd = list()
-            for arg in self._compress_info_command:
-                cmd.append(Template(arg).safe_substitute(file=file))
-            output = self._compress_info_command_output
-        elif file.endswith(self._compressed_from_pipe_ext):
+        if file.endswith(self._compressed_from_pipe_ext):
             cmd = list()
             for arg in self._compress_from_pipe_info:
                 cmd.append(Template(arg).safe_substitute(file=file))

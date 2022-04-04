@@ -353,7 +353,7 @@ databases:
             self._dump_process.wait()
             if self._dump_process.returncode == 0:
                 logger.info(
-                    "{}.save(): {}s".format(
+                    "{}.save(): {}".format(
                         save_atom.db_log_prefix(db_prefix, dbname),
                         self._compression.get_pipe_statistics(
                             compressed_filename, time.time() - start, CMode.DUMP, save_atom, db_prefix, dbname
