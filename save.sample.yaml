@@ -2,6 +2,7 @@ database_helpers:
   postgres:
     env:
       PGPASSWORD: '$password'
+      #LC_LANG: 'C'
     dump_command: [
       '/usr/bin/pg_dump',
       '--host=$host',
@@ -56,6 +57,7 @@ database_helpers:
   mysql:
     env:
       MYSQL_PWD: '$password'
+      #LC_LANG: 'C'
     dump_command: [
       '/usr/bin/mysqldump',
       '--host=$host',
@@ -118,17 +120,6 @@ compression_helpers:
     '$destination',
     '$file'
   ]
-  compress_info_command: [
-    '/usr/bin/lzop',
-    '-l',
-    '$file'
-  ]
-  compress_info_command_output: {
-    'data_line': -1,
-    'compressed_size_index': 1,
-    'uncompressed_size_index': 2,
-    'ratio_index': 3
-  }
   compress_from_pipe: [
     '/usr/bin/xz'
     #'/usr/bin/lzop'

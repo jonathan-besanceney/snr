@@ -29,13 +29,16 @@
 # ------------------------------------------------------------------------------
 import logging
 import time
+from string import Template
 from threading import Thread
+from datetime import datetime
 
 import schedule
 
 from snr.app import App
-from snr.app.saveatom import AppSaveStatusEnum
+from snr.app.saveatom import AppSaveStatusEnum, SaveAtom
 from snr.retention import Retention
+from snr.retention.retention import RetentionTypeEnum
 from snr.yamlhelper import YAMLHelper
 
 logger = logging.getLogger(__name__)
@@ -127,7 +130,7 @@ saves:
     def __init__(self, name, destination, retentions, schedules, allowed_actions, app, conf):
         """
 
-        :param name:
+        :param name: App name
         :type name: str
         :param destination:
         :type destination: str
@@ -278,9 +281,17 @@ saves:
         :return: filled save_atom
         :rtype: snr.app.SaveAtom
         """
+        if save_atom:
+            save_intent = save_atom.status if not AppSaveStatusEnum.UNDEFINED else AppSaveStatusEnum.FULL
+        else:
+            save_intent = AppSaveStatusEnum.FULL
+
         if not self.restoreable:
-            logger.error('{} has no save right !'.format(self._name))
+            logger.error("{}.save(): {} has no save right !".format(save_atom.app_log_prefix(), self._name))
             return
+
+        save_atom.date = datetime.today().strftime(App.C_DATE_FORMAT)
+        logger.info("{}.save(): Starting {} {} save".format(save_atom.app_log_prefix(), save_atom.date, save_intent.value))
 
         start = time.time()
         # Get default save_atom if none set
@@ -291,18 +302,23 @@ saves:
 
         if len(self._retentions) > 0:
             if Save.C_SAVE_RETENTION_DBS in self._retentions.keys() and save_atom.databases_root_path:
-                dbs_retention = Retention.get_instance(self._conf, self._retentions[Save.C_SAVE_RETENTION_DBS])
-                dbs_retention.run(save_atom.databases_root_path)
+                dbs_retention = Retention.get_instance(
+                    self._conf, self._retentions[Save.C_SAVE_RETENTION_DBS], RetentionTypeEnum.DBS
+                )
+                dbs_retention.run(save_atom)
 
             if Save.C_SAVE_RETENTION_FILES in self._retentions.keys() and save_atom.files_root_path:
-                files_retention = Retention.get_instance(self._conf, self._retentions[Save.C_SAVE_RETENTION_FILES])
-                files_retention.run(save_atom.files_root_path)
+                files_retention = Retention.get_instance(
+                    self._conf, self._retentions[Save.C_SAVE_RETENTION_FILES], RetentionTypeEnum.FILES
+                )
+                files_retention.run(save_atom)
 
-        logger.info("{} save done in {}s".format(self._name, time.time()-start))
-        if save_atom.status != AppSaveStatusEnum.FULL:
-            logger.warning("{} save is {}".format(self._name, save_atom.status.value))
+        logger.info("{}.save(): {} save done in {}s".format(save_atom.app_log_prefix(), self._name, time.time()-start))
+        if save_atom.status != save_intent:
+            logger.error("{}.save(): Finished {} save".format(save_atom.app_log_prefix(), save_atom.status.value))
         else:
-            logger.info("{} save is {}".format(self._name, save_atom.status.value))
+            logger.info("{}.save(): Finished {} save".format(save_atom.app_log_prefix(), save_atom.status.value))
+
         return save_atom
 
     @property
@@ -343,26 +359,53 @@ saves:
         :param allow_partial: Optional. Allow restoration of a partial save. FULL per default.
         :type allow_partial: snr.app.AppSaveStatusEnum
         """
+
         if not self.restoreable:
-            logger.error('{} has no restore right !'.format(self._name))
+            logger.error(
+                "{}: {} has no restore right !".format(
+                    Template(SaveAtom.C_LOG_MESSAGE_PREFIX_APP).safe_substitute(appname=self._app.name),
+                    self._name
+                )
+            )
             return
 
         if save_atom is None and date is None:
             save_atom = self.last_save
             if save_atom is None:
-                logger.error("I have nothing to restore !")
+                logger.error(
+                    "{}: I have nothing to restore !".format(
+                        Template(SaveAtom.C_LOG_MESSAGE_PREFIX_APP).safe_substitute(appname=self._app.name)
+                    )
+                )
                 return
 
         if date is not None and save_atom is None:
             if date not in self.save_atoms.keys():
                 logger.error(
-                    "You picked up a wrong save date {}. Valid one are {}".format(date, self.save_atoms.keys())
+                    "{}: You picked up a wrong save date {}. Valid one are {}".format(
+                        Template(SaveAtom.C_LOG_MESSAGE_PREFIX_APP).safe_substitute(appname=self._app.name),
+                        date,
+                        self.save_atoms.keys()
+                    )
                 )
                 return
             else:
                 save_atom = self.save_atoms[date]
-
-        self._app.restore(save_atom, allow_partial)
+        try:
+            logger.info(
+                "{}: Starting {} restore of {} backup".format(
+                    save_atom.app_log_prefix(),
+                    allow_partial.value,
+                    save_atom.date
+                )
+            )
+            self._app.restore(save_atom, allow_partial)
+        except KeyboardInterrupt:
+            logger.warning(
+                "{}.restore(): Interrupted".format(save_atom.app_log_prefix())
+            )
+            raise
+        logger.info("{}: Finished {} restore".format(save_atom.app_log_prefix(), allow_partial.value))
 
     @property
     def saveable(self):

@@ -73,17 +73,6 @@ compression_helpers:
     '$destination',
     '$file'
   ]
-  compress_info_command: [
-    '/usr/bin/lzop',
-    '-l',
-    '$file'
-  ]
-  compress_info_command_output: {
-    'data_line': -1,
-    'compressed_size_index': 1,
-    'uncompressed_size_index': 2,
-    'ratio_index': 3
-  }
   compress_from_pipe: [
     '/usr/bin/xz'
     #'/usr/bin/lzop'
@@ -119,7 +108,6 @@ compression_helpers:
         'compressed_extention', 'compressed_from_pipe_ext', 'compress_env',
         'compress_command', 'decompress_command',
         'compress_from_pipe', 'decompress_to_pipe',
-        'compress_info_command', 'compress_info_command_output',
         'compress_from_pipe_info', 'compress_from_pipe_info_output'
     }
 
@@ -132,8 +120,6 @@ compression_helpers:
             decompress_command=None,
             compress_from_pipe=None,
             decompress_to_pipe=None,
-            compress_info_command=None,
-            compress_info_command_output=None,
             compress_from_pipe_info=None,
             compress_from_pipe_info_output=None
     ):
@@ -147,8 +133,6 @@ compression_helpers:
         self._decompress_command = decompress_command
         self._compress_from_pipe = compress_from_pipe
         self._decompress_to_pipe = decompress_to_pipe
-        self._compress_info_command = compress_info_command
-        self._compress_info_command_output = compress_info_command_output
         self._compress_from_pipe_info = compress_from_pipe_info
         self._compress_from_pipe_info_output = compress_from_pipe_info_output
 
@@ -217,19 +201,27 @@ compression_helpers:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-    def compress_from_pipe(self, pipe, destination):
+    def compress_from_pipe(self, pipe, destination, save_atom, db_prefix, dbname):
         """
         Compress stream from pipe to destination.
         Compression extension will be added to destination file.
         :param pipe: will be used as stdin for the compression process.
         :type pipe: subprocess.PIPE
-        :param destination: destination file without extention
+        :param destination: destination file without extension
         :type destination: str
+        :param save_atom: saveatom being processed
+        :type save_atom: SaveAtom
+        :param db_prefix: DB prefix name as per config
+        :type db_prefix: str
+        :param dbname: DB name as per config
+        :type dbname: str
         :return: compressed file name, None on error
         :rtype: Union[str|None]
         """
         if pipe is None:
-            logger.error("Pipe is None, aborting compress_from_pipe()")
+            logger.error("{}: Pipe is None, aborting compress_from_pipe()".format(
+                save_atom.db_log_prefix(db_prefix, dbname))
+            )
             return None
 
         self._create_folder(destination)
@@ -238,7 +230,9 @@ compression_helpers:
         for env in self._compress_env.keys():
             os.environ[env] = self._compress_env[env]
 
-        logger.info("running {}".format(self._compress_from_pipe))
+        logger.info(
+            "{}: Pipe database dump to {}".format(save_atom.db_log_prefix(db_prefix, dbname), self._compress_from_pipe)
+        )
         with open(destination, 'wb') as f:
             p = subprocess.Popen(self._compress_from_pipe, stdin=pipe, stdout=f)
 
@@ -248,10 +242,10 @@ compression_helpers:
         if p.returncode == 0:
             return destination
 
-        logger.error(p)
+        logger.error("{}: {}".format(save_atom.db_log_prefix(db_prefix, dbname), p))
         return None
 
-    def compress(self, source, destination):
+    def compress(self, source, destination, save_atom, filename):
         """
         Compress source directory to destination file. Compress extension will be appended to destination file.
         Abort and delete partial file on any error.
@@ -260,11 +254,19 @@ compression_helpers:
         :type source: str
         :param destination: destination file without extension
         :type destination: str
+        :param save_atom: SaveAtom being processed
+        :type save_atom: SaveAtom
+        :param filename: filename name as per config
+        :type filename: str
         :return: destination or None if error
         :rtype: Union[str|None]
         """
         if not os.path.exists(source):
-            logger.error("{} does not exist. Aborting compress()".format(source))
+            logger.error(
+                "{}: {} does not exist. Aborting compress()".format(
+                    save_atom.file_log_prefix(filename), source
+                )
+            )
             return None
 
         destination = "{}.{}".format(destination, self._compressed_extention)
@@ -282,8 +284,10 @@ compression_helpers:
         try:
             start = time.time()
             Compression._create_folder(destination)
-            logger.info("Compress {} to {}".format(source, destination))
-            logger.info("running {}".format(cmd))
+            logger.info("{}: Compress {} to {} with {}".format(
+                save_atom.file_log_prefix(filename), source, destination, cmd
+            ))
+
             p = subprocess.Popen(cmd, stderr=subprocess.PIPE, cwd=source)
             err_count = 0
             with p.stderr as err:
@@ -291,7 +295,11 @@ compression_helpers:
                     # avoid stopping tar when issuing 'Removing leading `/' from member names'
                     if err_count > 0:
                         msg = msg.decode().replace('\n', '')
-                        logger.error("Compression {} to {} : {}".format(source, destination, msg))
+                        logger.error(
+                            "{}: Compression {} to {} : {}".format(
+                                save_atom.file_log_prefix(filename), source, destination, msg
+                            )
+                        )
                         raise ChildProcessError(msg)
                     err_count += 1
 
@@ -301,28 +309,41 @@ compression_helpers:
                 original_size = self.get_folder_size(source)
                 if original_size == 0:
                     logger.warning(
-                        "{} folder content is 0 byte. Please check your configuration: "
-                        "One apps->name->files might refer to empty folder and should be set to NULL.".format(source)
+                        "{}: {} folder content is 0 byte. Please check your configuration: "
+                        "One apps->name->files might refer to empty folder and should be set to NULL.".format(
+                            save_atom.file_log_prefix(filename), filename, source
+                        )
                     )
                 else:
-                    logger.info(Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS))
+                    logger.info(
+                        "{}: {}".format(
+                            save_atom.file_log_prefix(filename),
+                            Compression.get_statistics(original_size, destination, seconds, CMode.COMPRESS)
+                        )
+                    )
                 return destination
             logger.error(p)
             return None
         except KeyboardInterrupt:
             if p:
-                logger.warning("Caught keyboard interrupt. Terminating compression of {}".format(source))
+                logger.warning(
+                    "{}: Caught keyboard interrupt. Terminating compression of {}".format(
+                        save_atom.file_log_prefix(filename), source
+                    )
+                )
                 p.terminate()
-                logger.warning("Deleting partial file {}".format(destination))
+                logger.warning("{}: Deleting partial file {}".format(save_atom.file_log_prefix(filename), destination))
                 Compression.delete(destination)
                 return None
         except ChildProcessError:
             p.terminate()
-            logger.warning("Deleting partial file {}".format(destination))
+            logger.warning("{}: Deleting partial file {}".format(save_atom.file_log_prefix(filename), destination))
             Compression.delete(destination)
             return None
         except PermissionError as e:
-            logger.error("Cannot create directory {} : {}".format(destination, e))
+            logger.error(
+                "{}: Cannot create directory {} : {}".format(save_atom.file_log_prefix(filename), destination, e)
+            )
             return None
 
     @staticmethod
@@ -336,71 +357,96 @@ compression_helpers:
             logger.info("Deleting {}".format(file))
             os.remove(file)
 
-    def decompress_to_pipe(self, file):
+    def decompress_to_pipe(self, file, save_atom, db_prefix, dbname):
         """
         Decompress a file and return stream (stdout)
         :param file: file to decompress
         :type file: str
+        :param save_atom: saveatom being processed
+        :type save_atom: SaveAtom
+        :param db_prefix: database prefix as per config
+        :type db_prefix: str
+        :param dbname: database name as per config
+        :type dbname: str
         :return: decompressed stream
         :rtype: subprocess.PIPE
         """
         if not os.path.exists(file):
-            logger.error("{} does not exists. Aborting decompress_to_pipe().".format(file))
+            logger.error("{}: {} does not exists. Aborting decompress_to_pipe().".format(
+                save_atom.db_log_prefix(db_prefix, dbname), file
+            ))
             return None
         cmd = list()
         for arg in self._decompress_to_pipe:
             cmd.append(Template(arg).safe_substitute(file=file))
-        logger.info("running {}".format(cmd))
+        logger.info("{}: Extract dump with {}".format(save_atom.db_log_prefix(db_prefix, dbname), cmd))
         return subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
-    def decompress(self, file, destination):
+    def decompress(self, file, destination, save_atom, filename):
         """
         Decompress file in destination folder
         :param file: file to decompress
         :type file: str
         :param destination: destination folder
         :type destination: str
+        :param save_atom: saveatom being processed
+        :type save_atom: SaveAtom
+        :param filename: file name as per config
+        :type filename: str
         :return: destination folder, None on error
         :rtype: Union[str|None]
         """
         start = time.time()
         if not os.path.exists(file):
-            logger.error("Source {} does not exists. Aborting decompress().".format(file))
+            logger.error(
+                "{}: Source {} does not exists. Aborting decompress().".format(
+                    save_atom.file_log_prefix(filename), file
+                )
+            )
             return None
 
         if not os.path.exists(destination):
-            logger.warning("Creating dir {}".format(destination))
+            logger.warning("{}: Creating dir {}".format(save_atom.file_log_prefix(filename), destination))
             try:
                 Compression._create_folder(destination, is_dir=True)
             except PermissionError as e:
-                logger.error("Cannot create directory {} : {}".format(destination, e))
+                logger.error(
+                    "{}: Cannot create directory {} : {}".format(save_atom.file_log_prefix(filename), destination, e)
+                )
                 return None
 
         cmd = list()
         for arg in self._decompress_command:
             cmd.append(Template(arg).safe_substitute(file=file))
-        logger.info("Decompress {} to {}".format(file, destination))
-        logger.info("running {}".format(cmd))
+        logger.info(
+            "{}: Decompress {} to {} with {}".format(save_atom.file_log_prefix(filename), file, destination, cmd)
+        )
+
         try:
             p = subprocess.run(cmd, cwd=destination)
             if p.returncode == 0:
                 seconds = time.time() - start
                 original_size = self.get_folder_size(destination)
-                logger.info(Compression.get_statistics(original_size, file, seconds, CMode.DECOMPRESS))
+                logger.info(
+                    "{}: {}".format(
+                        save_atom.file_log_prefix(filename),
+                        Compression.get_statistics(original_size, file, seconds, CMode.DECOMPRESS)
+                    )
+                )
                 return destination
             logger.error(p)
             return None
         except KeyboardInterrupt:
-            logger.warning("Caught KeyboardInterrupt !")
+            logger.warning("{}: Caught KeyboardInterrupt !".format(save_atom.file_log_prefix(filename)))
             return None
         except ChildProcessError as e:
-            logger.warning("{}".format(e))
+            logger.warning("{}: {}".format(save_atom.file_log_prefix(filename), e))
             return None
         except PermissionError as e:
-            logger.error("Cannot read {} : {}".format(destination, e))
+            logger.error("{}: Cannot read {} : {}".format(save_atom.file_log_prefix(filename), destination, e))
             return None
         except FileNotFoundError as e:
-            logger.error("Cannot decompress in {} : {}".format(destination, e))
+            logger.error("{}: Cannot decompress in {} : {}".format(save_atom.file_log_prefix(filename), destination, e))
             return None
 
     @staticmethod
@@ -415,7 +461,7 @@ compression_helpers:
         root_directory = Path(folder)
         return sum(f.stat().st_size for f in root_directory.glob('**/*') if f.is_file())
 
-    def get_pipe_statistics(self, file, seconds, mode):
+    def get_pipe_statistics(self, file, seconds, mode, save_atom, db_prefix, dbname):
         """
         :param file: compressed file path
         :type file: str
@@ -423,15 +469,16 @@ compression_helpers:
         :type seconds: float
         :param mode: Display stats for COMPRESSION or DECOMPRESSION
         :type mode: CMode
+        :param save_atom: saveatom being processed
+        :type save_atom: SaveAtom
+        :param db_prefix: database prefix as per config
+        :type db_prefix: str
+        :param dbname: database name as per config
+        :type dbname: str
         :return: statistics
         :rtype: str
         """
-        if file.endswith(self._compressed_extention):
-            cmd = list()
-            for arg in self._compress_info_command:
-                cmd.append(Template(arg).safe_substitute(file=file))
-            output = self._compress_info_command_output
-        elif file.endswith(self._compressed_from_pipe_ext):
+        if file.endswith(self._compressed_from_pipe_ext):
             cmd = list()
             for arg in self._compress_from_pipe_info:
                 cmd.append(Template(arg).safe_substitute(file=file))
@@ -439,7 +486,7 @@ compression_helpers:
         else:
             return
 
-        logger.info("running {}".format(cmd))
+        logger.info("{}: Getting statistics from {}".format(save_atom.db_log_prefix(db_prefix, dbname), cmd))
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         lines = list()
         with p.stdout as out:
@@ -449,14 +496,18 @@ compression_helpers:
 
         original_size_bytes = int(data_line[output['uncompressed_size_index']])
         if original_size_bytes == 0:
-            logger.warning("Can't read following output to compute stats: {}".format(data_line))
+            logger.warning(
+                "{}: Can't read following output to compute stats: {}".format(
+                    save_atom.db_log_prefix(db_prefix, dbname), data_line
+                )
+            )
             return "Will not compute stats for {} due to previous error.".format(file)
 
         original_size = Units.convert_bytes(original_size_bytes)
         compressed_size_bytes = int(data_line[output['compressed_size_index']])
         compressed_size = Units.convert_bytes(compressed_size_bytes)
         ratio = data_line[output['ratio_index']]
-        time_spent = Units.convert_seconds(seconds)
+        time_spent = seconds
         bitrate = Units.get_bitrate(original_size_bytes, seconds)
 
         return Compression._print_stats(
@@ -486,7 +537,7 @@ compression_helpers:
             compressed_size_bytes = os.stat(compressed_file).st_size
             compressed_size = Units.convert_bytes(compressed_size_bytes)
             ratio = round(compressed_size_bytes / original_size_bytes, ndigits=2)
-            time_spent = Units.convert_seconds(seconds)
+            time_spent = seconds
             bitrate = Units.get_bitrate(original_size_bytes, seconds)
             return Compression._print_stats(
                 compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode
@@ -495,16 +546,16 @@ compression_helpers:
     @staticmethod
     def _print_stats(compressed_file, compressed_size, time_spent, bitrate, original_size, ratio, mode):
         if mode == CMode.COMPRESS:
-            stats = 'Compressed {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Compressed {file} of {compressed_size} in {time_spent}s. ' \
                     'Compression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
         elif mode == CMode.DUMP:
-            stats = 'Dumped {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Dumped {file} of {compressed_size} in {time_spent}s. ' \
                     'Dump bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
         elif mode == CMode.DECOMPRESS:
-            stats = 'Decompressed {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Decompressed {file} of {compressed_size} in {time_spent}s. ' \
                     'Decompression bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
         elif mode == CMode.RESTORE:
-            stats = 'Restored {file} of {compressed_size} in {time_spent}. ' \
+            stats = 'Restored {file} of {compressed_size} in {time_spent}s. ' \
                     'Restoration bitrate: {bitrate}, original size: {original_size}, ratio: {ratio}.'
 
         return stats.format(

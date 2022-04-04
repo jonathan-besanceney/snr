@@ -31,6 +31,7 @@ import os
 import pprint
 from enum import Enum
 from pathlib import Path
+from string import Template
 
 
 class AppSaveStatusEnum(Enum):
@@ -45,8 +46,13 @@ class SaveAtom:
     PART_TYPES = {FILE, DATABASE}
     MISSING_FLAG = "(missing!)"
 
-    def __init__(self, databases=None, files=None):
+    C_LOG_MESSAGE_PREFIX_APP = "apps[$appname]"
+    C_LOG_MESSAGE_PREFIX_DB = C_LOG_MESSAGE_PREFIX_APP + ".databases[$db_prefix$dbname]"
+    C_LOG_MESSAGE_PREFIX_FILE = C_LOG_MESSAGE_PREFIX_APP + ".files[$name]"
+
+    def __init__(self, appname=None, databases=None, files=None):
         self._date = None
+        self._appname = appname
         self._databases = dict()
         if databases:
             self.databases = databases
@@ -55,10 +61,13 @@ class SaveAtom:
         if files:
             self.files = files
         self._files_root_path = None
+        self._log_prefix_app = Template(self.C_LOG_MESSAGE_PREFIX_APP).safe_substitute(appname=appname)
+        self._log_prefix_dbs = dict()
+        self._log_prefix_files = dict()
         self._status = AppSaveStatusEnum.UNDEFINED
 
     def clone(self):
-        cloned = SaveAtom()
+        cloned = SaveAtom(appname=self._appname)
         cloned._date = None
         cloned._databases = dict(self._databases)
         cloned._files = dict(self._files)
@@ -66,11 +75,22 @@ class SaveAtom:
         return cloned
 
     @property
+    def appname(self):
+        return self._appname
+
+    @property
     def date(self):
+        """
+        :rtype: str
+        """
         return self._date
 
     @date.setter
     def date(self, save_date):
+        """
+        :param save_date:
+        :type save_date: str
+        """
         self._date = save_date
 
     def get_database(self, name):
@@ -197,6 +217,27 @@ class SaveAtom:
             else:
                 self._status = AppSaveStatusEnum.UNDEFINED
         return self._status
+
+    def app_log_prefix(self):
+        return self._log_prefix_app
+
+    def db_log_prefix(self, db_prefix, dbname):
+        key = "{}{}".format(db_prefix, dbname)
+        if key not in self._log_prefix_dbs:
+            self._log_prefix_dbs[key] = Template(self.C_LOG_MESSAGE_PREFIX_DB).safe_substitute(
+                appname=self._appname,
+                db_prefix=db_prefix,
+                dbname=dbname
+            )
+        return self._log_prefix_dbs[key]
+
+    def file_log_prefix(self, name):
+        if name not in self._log_prefix_files:
+            self._log_prefix_files[name] = Template(self.C_LOG_MESSAGE_PREFIX_FILE).safe_substitute(
+                appname=self._appname,
+                name=name
+            )
+        return self._log_prefix_files[name]
 
     def __repr__(self):
         pp = pprint.PrettyPrinter(indent=2)
