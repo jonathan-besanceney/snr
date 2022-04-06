@@ -290,13 +290,14 @@ saves:
             logger.error("{}.save(): {} has no save right !".format(save_atom.app_log_prefix(), self._name))
             return
 
-        save_atom.date = datetime.today().strftime(App.C_DATE_FORMAT)
-        logger.info("{}.save(): Starting {} {} save".format(save_atom.app_log_prefix(), save_atom.date, save_intent.value))
-
         start = time.time()
         # Get default save_atom if none set
         if save_atom is None:
             save_atom = self._app.save_atom
+
+        save_atom.date = datetime.today().strftime(App.C_DATE_FORMAT)
+        logger.info(
+            "{}.save(): Starting {} {} save".format(save_atom.app_log_prefix(), save_atom.date, save_intent.value))
 
         save_atom = self._app.save(self._destination, save_atom)
 
